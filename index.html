@@ -1,0 +1,2880 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台灣手語「放」共構辨識與卡通生成系統（本機真實鏡頭 MediaPipe 版）</title>
+  <meta name="description" content="台灣手語「放」(PUT) 代形詞共構結構：即時雙手 MediaPipe Landmark 錄影、IndexedDB 語料資料庫、可擴充語言學規則引擎、可解釋 AI 辨識與卡通人物手語生成。" />
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --surface: #ffffff;
+      --surface-alt: #f0ede6;
+      --border: #e2dcd2;
+      --fg: #1f2328;
+      --muted: #666c75;
+      --primary: #d15b42;
+      --primary-fg: #ffffff;
+      --sage: #2a8572;
+      --warn: #c77b24;
+      --danger: #c63e3e;
+      --radius: 16px;
+      --shadow: 0 2px 10px rgba(31, 35, 40, 0.04);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1240px; margin: 0 auto; padding: 24px 20px 48px; }
+    .header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end;
+      gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+    }
+    .kicker { font-size: 12px; color: var(--sage); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+    h1 { margin: 4px 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.02em; }
+    h2 { margin: 0 0 4px; font-size: 17px; font-weight: 700; }
+    .subtitle { margin: 0; font-size: 14px; color: var(--muted); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .between { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow);
+    }
+    .subcard {
+      background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    }
+    .tabs {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+      background: var(--surface-alt); border: 1px solid var(--border); border-radius: 16px; padding: 6px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .tabs { grid-template-columns: repeat(2, 1fr); } }
+    .tab-btn {
+      border: 0; background: transparent; padding: 11px 14px; border-radius: 12px;
+      font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all .18s;
+    }
+    .tab-btn[data-active="true"] {
+      background: var(--surface); color: var(--primary); font-weight: 700;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .grid-12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
+    .col-7 { grid-column: span 7; }
+    .col-6 { grid-column: span 6; }
+    .col-5 { grid-column: span 5; }
+    .col-12 { grid-column: span 12; }
+    @media (max-width: 960px) { .col-7, .col-6, .col-5 { grid-column: span 12; } }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (max-width: 760px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+    .hidden { display: none !important; }
+    .btn {
+      border: 1px solid var(--border); background: var(--surface); color: var(--fg);
+      border-radius: 11px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--primary); }
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: var(--primary-fg); }
+    .btn-primary:hover:not(:disabled) { opacity: 0.92; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600;
+      padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-alt);
+    }
+    input[type="text"], input[type="password"], select {
+      width: 100%; border: 1px solid var(--border); background: var(--surface);
+      color: var(--fg); border-radius: 10px; padding: 8px 12px; font-size: 13px;
+    }
+    label.field-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; font-weight: 600; }
+    .stage {
+      position: relative; width: 100%; aspect-ratio: 16 / 9; background: #1d2228;
+      border-radius: 14px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .stage-badge {
+      position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .stage-right-badge {
+      position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.92); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12px; font-family: monospace;
+    }
+    .meter-track { height: 7px; border-radius: 999px; background: #dfd9ce; overflow: hidden; margin: 6px 0; }
+    .meter-fill { height: 100%; border-radius: 999px; background: var(--primary); transition: width 0.15s; }
+    .step-card { cursor: pointer; transition: all .15s; }
+    .step-card[data-active="true"] { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .scroll-box { max-height: 410px; overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 10px; }
+    .trace-box {
+      max-height: 180px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 12px; line-height: 1.65;
+    }
+    .space-y > * + * { margin-top: 14px; }
+    .space-y-sm > * + * { margin-top: 8px; }
+    .muted { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div>
+        <div class="kicker">TSL Linguistics × MediaPipe × Explainable AI</div>
+        <h1>台灣手語「放」共構辨識與卡通生成系統</h1>
+        <p class="subtitle">本機實戰版：支援真實鏡頭 42 點雙手即時追蹤、錄影存檔、IndexedDB 資料庫、可擴充語言規則與卡通人物生成</p>
+      </div>
+      <div class="row">
+        <div class="subcard row" style="padding: 6px 10px;">
+          <span class="muted">慣用手：</span>
+          <button id="btnRightHanded" class="btn btn-sm btn-primary" onclick="setHandedness('right')">右撇子（主右／副左）</button>
+          <button id="btnLeftHanded" class="btn btn-sm" onclick="setHandedness('left')">左撇子（主左／副右）</button>
+        </div>
+        <span id="mpStatusPill" class="pill">MediaPipe 載入中...</span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn" data-tab="record" data-active="true" onclick="switchTab('record')">1. 錄影與語料資料庫</button>
+      <button class="tab-btn" data-tab="rules" data-active="false" onclick="switchTab('rules')">2. 教 AI 語言現象規則</button>
+      <button class="tab-btn" data-tab="recognize" data-active="false" onclick="switchTab('recognize')">3. AI 共構句子辨識</button>
+      <button class="tab-btn" data-tab="avatar" data-active="false" onclick="switchTab('avatar')">4. 卡通人物生成手語</button>
+      <button class="tab-btn" data-tab="learn" data-active="false" onclick="switchTab('learn')">5. AI 自主學習中心</button>
+    </nav>
+
+    <!-- TAB 1: RECORD & DATABASE -->
+    <section id="tab-record" class="grid-12">
+      <div class="card col-7 space-y">
+        <div class="between">
+          <div>
+            <h2>01 Holistic 全身錄影（臉部＋姿勢＋雙手）與單詞／句子擷取</h2>
+            <p class="muted" style="margin:0;">同步追蹤臉部 478 點、姿勢 33 點與雙手 42 點（共 553 點）；可錄「單詞教學」或「完整句子」</p>
+          </div>
+          <div class="row">
+            <label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+              <input id="chkHolisticOnly" type="checkbox" checked /> 純黑底骨架（保護隱私）
+            </label>
+            <button id="srcCamBtn" class="btn btn-sm" onclick="setRecordSource('camera')">真實鏡頭 (Holistic)</button>
+            <button id="srcSimBtn" class="btn btn-sm" onclick="setRecordSource('sim')">示範模擬串流</button>
+          </div>
+        </div>
+
+        <div class="stage" style="background:#0f1417;">
+          <video id="recVideo" playsinline muted class="hidden"></video>
+          <canvas id="recCanvas" width="760" height="428"></canvas>
+          <div class="stage-badge" style="background:rgba(15,20,23,0.85);color:#eef2f5;border-color:#2a343b;">
+            <span id="recDot" style="width:8px;height:8px;border-radius:999px;background:#888;display:inline-block;"></span>
+            <span id="recStatusText">待命</span>
+          </div>
+          <div id="recTimerBadge" class="stage-right-badge" style="background:rgba(15,20,23,0.85);color:#eef2f5;border-color:#2a343b;">00:00 · 0 frames</div>
+        </div>
+
+        <div id="liveTrackerReadout" class="subcard between" style="font-size:12px;">
+          <span id="liveDhReadout">主手：等待偵測...</span>
+          <span id="liveNdhReadout">非主手：等待偵測...</span>
+          <span id="liveHolisticReadout" style="color:var(--sage);font-weight:600;">臉部＋姿勢：待命</span>
+        </div>
+
+        <div id="simPickerBar" class="subcard row">
+          <span class="muted" style="font-weight:600;">示範動作來源：</span>
+          <select id="simActionSelect" style="width:auto;min-width:210px;"></select>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">錄製類型（先教單詞，再錄完整句子！）</label>
+            <select id="recClipType" onchange="onClipTypeChange()">
+              <option value="sentence">完整句子（物件 → 桌子 → 共構放）</option>
+              <option value="word_noun">單詞教學：物件名詞（如 西瓜、衣服、蘋果、杯子、筆）</option>
+              <option value="word_loc">單詞教學：處所名詞（如 桌子）</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">語者編號（受試聾人 ID）</label>
+            <input id="recSignerId" type="text" value="D01" placeholder="如：D01、D02" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">句型／單詞文字名稱</label>
+            <input id="recLabelInput" type="text" value="蘋果放在桌子上" />
+          </div>
+          <div>
+            <label class="field-label">關聯物件與規則</label>
+            <select id="recObjectSelect"></select>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div>
+            <label class="field-label">預期主手手形</label>
+            <select id="recDhShape">
+              <option value="Open O">Open O (果)</option>
+              <option value="Bent 5">Bent 5 (同)</option>
+              <option value="Bent C">Bent C (紳)</option>
+              <option value="Open B">Open B (手)</option>
+              <option value="C">C (方)</option>
+              <option value="1">1 (一)</option>
+              <option value="Flat O">Flat O (萬)</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">非主手共構設定</label>
+            <select id="recNdhMode">
+              <option value="Open B_down">Open B 掌心朝下（桌子）</option>
+              <option value="Open B_up">Open B 掌心朝上（一般放）</option>
+              <option value="none">無共構參照</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">取樣 FPS</label>
+            <select id="recFpsSelect">
+              <option value="15" selected>15 FPS（建議）</option>
+              <option value="10">10 FPS</option>
+              <option value="30">30 FPS</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="overwriteBanner" class="subcard between hidden" style="border-color:var(--primary);font-size:12px;">
+          <div>
+            <b style="color:var(--primary);">🔄 重錄覆蓋模式：</b>
+            <span id="overwriteTargetText">正在覆蓋樣本</span>
+            <span class="muted">（重新錄影後按「🔄 覆蓋原紀錄」即取代舊檔）</span>
+          </div>
+          <button class="btn btn-sm" onclick="cancelOverwriteMode()">取消覆蓋</button>
+        </div>
+
+        <div class="between">
+          <div class="row">
+            <button id="btnStartRec" class="btn btn-primary" onclick="toggleRecording()">● 開始錄影與擷取</button>
+            <button id="btnSaveSample" class="btn" onclick="saveCurrentRecording()" disabled>存入資料庫</button>
+            <button id="btnDownloadVideo" class="btn btn-sm" onclick="downloadLastVideo()" disabled>下載影片 (.webm)</button>
+          </div>
+          <div class="row">
+            <button id="btnExpJson" class="btn btn-sm" onclick="exportCurrentLandmark('json')" disabled>JSON</button>
+            <button id="btnExpJsonl" class="btn btn-sm" onclick="exportCurrentLandmark('jsonl')" disabled>JSONL</button>
+            <button id="btnExpCsv" class="btn btn-sm" onclick="exportCurrentLandmark('csv')" disabled>CSV</button>
+          </div>
+        </div>
+        <div id="recMessage" class="muted"></div>
+      </div>
+
+      <div class="card col-5 space-y">
+        <div class="between">
+          <div>
+            <h2>02 本機手語語料資料庫</h2>
+            <p class="muted" style="margin:0;">支援編輯改名、重錄覆蓋、刪除與復原、匯出／匯入</p>
+          </div>
+          <span id="sampleCountPill" class="pill">0 筆</span>
+        </div>
+
+        <div class="grid-3" style="text-align:center;">
+          <div class="subcard"><div id="statSamples" style="font-size:20px;font-weight:700;">0</div><div class="muted">語料樣本</div></div>
+          <div class="subcard"><div id="statRules" style="font-size:20px;font-weight:700;">3</div><div class="muted">語言規則</div></div>
+          <div class="subcard"><div id="statObjects" style="font-size:20px;font-weight:700;">6</div><div class="muted">物件辭典</div></div>
+        </div>
+
+        <input id="sampleSearchInput" type="text" placeholder="🔍 搜尋句型、手形或語者編號（如 D01、西瓜）..." oninput="renderSampleList()" />
+
+        <div class="row">
+          <label class="btn btn-sm" style="cursor:pointer;">
+            匯入 JSON / JSONL
+            <input type="file" accept=".json,.jsonl,.csv" class="hidden" onchange="handleImportFile(event)" />
+          </label>
+          <button class="btn btn-sm" onclick="exportFullDatabase()">匯出備份 (.json)</button>
+          <button class="btn btn-sm" onclick="exportLinguisticAnnotationCsv()" title="匯出符合期末報告第 13 頁規格之語言學標註表">📊 語言學標註表 (.csv)</button>
+          <button class="btn btn-sm" onclick="resetDemoDatabase()">重載預設</button>
+        </div>
+
+        <!-- Google Sheets + Google Drive Cloud Database Panel -->
+        <div class="subcard space-y-sm" style="border-color:var(--sage);">
+          <div class="between">
+            <span style="font-size:12px;font-weight:700;color:var(--sage);">☁️ Google 試算表 ＋ 硬碟影片資料庫</span>
+            <span id="gsStatusBadge" class="muted" style="font-size:11px;">尚未設定網址</span>
+          </div>
+          <div class="row">
+            <input id="gsEndpointInput" type="text" placeholder="貼上 Apps Script 網頁應用程式網址 (https://script.google.com/.../exec)" style="flex:1;font-size:12px;" onchange="saveGsEndpoint(this.value)" />
+            <button class="btn btn-sm" onclick="testGsConnection()">連線測試</button>
+          </div>
+          <div class="between" style="font-size:12px;">
+            <div class="row" style="gap:10px;">
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+                <input id="chkAutoSyncGs" type="checkbox" checked />
+                <span>自動上傳試算表</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;cursor:pointer;" title="同時將錄影或上傳的影片存進你 Google 硬碟「TSL_PUT_影片語料庫」（單檔上限 12MB）">
+                <input id="chkUploadVideoToDrive" type="checkbox" checked />
+                <span>🎬 影片存進 Google 硬碟</span>
+              </label>
+            </div>
+            <div class="row" style="gap:6px;">
+              <button class="btn btn-sm" onclick="syncUploadAllToGs()">⬆️ 上傳全部</button>
+              <button class="btn btn-sm btn-primary" onclick="syncPullFromGs()">⬇️ 同步下載</button>
+              <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製自動綁定試算表的專屬網址給聾人受試者">🔗 分享連結</button>
+            </div>
+          </div>
+          <div id="gsSyncMessage" class="muted" style="font-size:11px;">綁定後，錄影存檔或上傳影片會自動寫入 Google 試算表，並將影片存進你 Google 硬碟的「TSL_PUT_影片語料庫」。</div>
+        </div>
+
+        <div id="undoDeleteBar" class="subcard between hidden" style="border-color:var(--warn);font-size:12px;">
+          <span id="undoDeleteText">已刪除樣本</span>
+          <button class="btn btn-sm" onclick="undoDeleteSample()">↩ 復原刪除</button>
+        </div>
+
+        <div id="sampleListContainer" class="scroll-box"></div>
+      </div>
+    </section>
+
+    <!-- TAB 2: RULES & LEXICON -->
+    <section id="tab-rules" class="hidden space-y">
+      <div class="card space-y">
+        <div class="between">
+          <div>
+            <h2>台灣手語「放」語言學規則庫（可隨時新增規則）</h2>
+            <p class="muted" style="margin:0;">目前收錄三種核心規則，可點擊右側按鈕新增第四種、第五種新規則</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="toggleNewRuleForm()">＋ 新增規則類型</button>
+        </div>
+
+        <div id="newRuleForm" class="subcard hidden space-y-sm">
+          <div style="font-weight:700;font-size:14px;">新增「放」語言現象規則</div>
+          <div class="grid-2">
+            <div><label class="field-label">規則名稱</label><input id="newRuleName" type="text" placeholder="例如：第四種：雙手合抱大型物體共構放" /></div>
+            <div><label class="field-label">觸發條件</label><input id="newRuleCondition" type="text" placeholder="例如：物件體積龐大需雙手搬運（箱子、椅子）" /></div>
+            <div>
+              <label class="field-label">共構模式</label>
+              <select id="newRuleCoMode">
+                <option value="simultaneous_down">非主手 Open B 朝下支撐 ＋ 主手代形詞朝上向下放</option>
+                <option value="lexical_put">雙手一般詞彙「放 (8-084)」掌心朝上疊放</option>
+                <option value="bimanual_handle">雙手同時握持代形詞向下放置</option>
+              </select>
+            </div>
+            <div><label class="field-label">語言學說明</label><input id="newRuleDesc" type="text" placeholder="描述 AI 判讀依據" /></div>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" onclick="addNewRule()">儲存新規則</button>
+            <button class="btn btn-sm" onclick="toggleNewRuleForm()">取消</button>
+          </div>
+        </div>
+
+        <div id="rulesGrid" class="grid-3"></div>
+      </div>
+
+      <div class="card space-y">
+        <div class="between">
+          <div>
+            <h2>物件外形 → 「放」代形詞對照辭典</h2>
+            <p class="muted" style="margin:0;">新增物件後，AI 辨識與卡通人物動畫立即自動生效</p>
+          </div>
+          <button class="btn btn-sm" onclick="toggleNewObjectForm()">＋ 新增物件</button>
+        </div>
+
+        <div id="newObjectForm" class="subcard hidden space-y-sm">
+          <div class="grid-3">
+            <div><label class="field-label">物件名詞</label><input id="objName" type="text" placeholder="如：橘子、手機" /></div>
+            <div><label class="field-label">外形特徵</label><input id="objShapeDesc" type="text" placeholder="如：小圓形、扁平長方" /></div>
+            <div><label class="field-label">適用規則</label><select id="objRuleId"></select></div>
+            <div><label class="field-label">原詞彙手語構成</label><input id="objLexicalGloss" type="text" placeholder="如：黃+水果" /></div>
+            <div>
+              <label class="field-label">主手手形</label>
+              <select id="objHandshape">
+                <option value="Open O">Open O (果)</option>
+                <option value="Bent 5">Bent 5 (同)</option>
+                <option value="Bent C">Bent C (紳)</option>
+                <option value="C">C (方)</option>
+                <option value="1">1 (一)</option>
+                <option value="Flat O">Flat O (萬)</option>
+                <option value="Open B">Open B (手) - 一般放</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">主手掌心</label>
+              <select id="objPalm"><option value="up">掌心朝上</option><option value="down">掌心朝下</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary btn-sm" onclick="addNewObject()">加入辭典</button>
+            <button class="btn btn-sm" onclick="toggleNewObjectForm()">取消</button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>物件</th><th>外形與詞彙</th><th>規則</th><th>主手手形／掌心</th><th style="text-align:right;">操作</th></tr>
+            </thead>
+            <tbody id="objectTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: RECOGNIZER -->
+    <section id="tab-recognize" class="hidden grid-12">
+      <div class="card col-7 space-y">
+        <div class="between">
+          <div>
+            <h2>AI 共構「放」辨識與三段句子推理</h2>
+            <p class="muted" style="margin:0;">結合 Holistic 全身骨架、單詞詞庫前段辨識與後段「放」掌心共構驗證</p>
+          </div>
+          <div class="row">
+            <label style="font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+              <input id="chkBlindMode" type="checkbox" checked /> 🕵️ 盲測模式（由單詞庫自行辨識名詞）
+            </label>
+            <span id="recogBadge" class="pill">待分析</span>
+          </div>
+        </div>
+
+        <div class="subcard space-y-sm">
+          <div style="font-size:12px;font-weight:700;">快速測試案例（驗證 AI 認得出「放」，且不誤判非放置手語）：</div>
+          <div id="recogScenarioChips" class="row"></div>
+        </div>
+
+        <div class="stage" style="background:#0f1417;">
+          <canvas id="recogCanvas" width="760" height="428"></canvas>
+          <div id="recogPhaseBanner" class="stage-badge" style="background:rgba(15,20,23,0.85);color:#eef2f5;border-color:#2a343b;">請選擇上方案例或資料庫樣本</div>
+          <div id="recogVerdictOverlay" class="hidden" style="position:absolute;bottom:12px;left:12px;right:12px;background:rgba(255,255,255,0.95);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+            <div>
+              <div class="muted">AI 句子辨識結果</div>
+              <div id="recogFinalSentence" style="font-size:17px;font-weight:800;">—</div>
+            </div>
+            <span id="recogIsPutPill" class="pill">—</span>
+          </div>
+        </div>
+
+        <div class="between">
+          <div class="row">
+            <span class="muted">分析資料庫樣本：</span>
+            <select id="recogDbSelect" style="width:auto;min-width:190px;"></select>
+            <button class="btn btn-primary btn-sm" onclick="runDbSampleRecognition()">開始分析</button>
+          </div>
+          <button class="btn btn-sm" onclick="replayCurrentRecognition()">↻ 重新播放</button>
+        </div>
+      </div>
+
+      <div class="card col-5 space-y">
+        <div>
+          <h2>可解釋 AI 語言學推理儀表</h2>
+          <p class="muted" style="margin:0;">拆解 4 項幾何與語言特徵，說明 AI 如何判定此為「放」</p>
+        </div>
+        <div class="subcard">
+          <div class="between"><span style="font-size:12px;font-weight:700;">① 非主手支撐面（Hold ＋ 手形／掌心）</span><span id="m1Val" style="font-family:monospace;font-weight:700;">—</span></div>
+          <div class="meter-track"><div id="m1Bar" class="meter-fill" style="width:0%"></div></div>
+          <div id="m1Sub" class="muted">等待訊號...</div>
+        </div>
+        <div class="subcard">
+          <div class="between"><span style="font-size:12px;font-weight:700;">② 主手手形與張開度分類</span><span id="m2Val" style="font-family:monospace;font-weight:700;">—</span></div>
+          <div class="meter-track"><div id="m2Bar" class="meter-fill" style="width:0%"></div></div>
+          <div id="m2Sub" class="muted">區分 Open O / Bent 5 / Bent C / C / 1</div>
+        </div>
+        <div class="subcard">
+          <div class="between"><span style="font-size:12px;font-weight:700;">③ 「放」向下接觸軌跡不變量</span><span id="m3Val" style="font-family:monospace;font-weight:700;">—</span></div>
+          <div class="meter-track"><div id="m3Bar" class="meter-fill" style="width:0%"></div></div>
+          <div id="m3Sub" class="muted">排除靜止名詞或無關水平移動</div>
+        </div>
+        <div class="subcard">
+          <div class="between"><span style="font-size:12px;font-weight:700;">④ 語言學規則庫推理</span><span id="m4Val" style="font-family:monospace;font-weight:700;">—</span></div>
+          <div class="meter-track"><div id="m4Bar" class="meter-fill" style="width:0%"></div></div>
+          <div id="m4Sub" class="muted">自動比對規則一／二／三或自訂新規則</div>
+        </div>
+        <div>
+          <div class="muted" style="font-weight:700;margin-bottom:6px;">推理紀錄</div>
+          <div id="reasoningTrace" class="subcard trace-box">請於左側選擇任一案例開始分析。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: CARTOON AVATAR -->
+    <section id="tab-avatar" class="hidden grid-12">
+      <div class="card col-7 space-y">
+        <div class="between">
+          <div>
+            <h2>卡通人物台灣手語生成舞台</h2>
+            <p class="muted" style="margin:0;">支援「文字規則生成」與「真實 Landmark 並排驅動（第 8 章動作生成）」</p>
+          </div>
+          <div class="row" style="font-size:12px;">
+            <button id="btnAvModeRule" class="btn btn-sm btn-primary" onclick="setAvatarMode('rule')">文字規則生成</button>
+            <button id="btnAvModeLm" class="btn btn-sm" onclick="setAvatarMode('landmark')">真實骨架並排驅動</button>
+            <label><input id="chkShowSkeleton" type="checkbox" /> 疊加骨架</label>
+            <label><input id="chkShowZoom" type="checkbox" checked /> 手形放大鏡</label>
+          </div>
+        </div>
+
+        <div id="avatarRuleInputBar" class="row">
+          <input id="avatarSentenceInput" type="text" value="蘋果放在桌子上" style="flex:1;" />
+          <button class="btn btn-primary" onclick="generateAvatarSign()">▶ 生成手語動畫</button>
+        </div>
+
+        <div id="avatarLmInputBar" class="row hidden">
+          <select id="avatarLmSampleSelect" style="flex:1;" onchange="loadAvatarLandmarkSample()"></select>
+          <button class="btn btn-primary btn-sm" onclick="loadAvatarLandmarkSample()">▶ 載入真實骨架驅動</button>
+        </div>
+
+        <div id="avatarQuickChips" class="row"></div>
+
+        <div class="stage" style="aspect-ratio:16/10;background:var(--surface-alt);">
+          <canvas id="avatarCanvas" width="760" height="475"></canvas>
+          <div id="avatarStagePill" class="stage-badge">準備演出</div>
+        </div>
+
+        <div class="subcard between">
+          <div class="row">
+            <button id="btnAvatarPlayPause" class="btn btn-sm" onclick="toggleAvatarPlay()">⏸ 暫停</button>
+            <button class="btn btn-sm" onclick="replayAvatar()">↻ 重播</button>
+          </div>
+          <input id="avatarScrubber" type="range" min="0" max="100" value="0" style="flex:1;max-width:240px;" oninput="scrubAvatar(this.value)" />
+          <div class="row">
+            <button id="spd05" class="btn btn-sm" onclick="setAvatarSpeed(0.5)">0.5x</button>
+            <button id="spd10" class="btn btn-sm btn-primary" onclick="setAvatarSpeed(1)">1x</button>
+            <button id="spd15" class="btn btn-sm" onclick="setAvatarSpeed(1.5)">1.5x</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col-5 space-y">
+        <div>
+          <h2>句型語言學剖析與分鏡腳本</h2>
+          <p class="muted" style="margin:0;">點擊任一步驟卡片即可定格檢視手形與共構位置</p>
+        </div>
+        <div id="avatarRuleSummary" class="subcard space-y-sm" style="font-size:13px;"></div>
+        <div id="avatarStepCards" class="space-y-sm"></div>
+        <div class="grid-2">
+          <div class="subcard">
+            <div id="specNdhTitle" class="muted">非主手（左手）</div>
+            <div id="specNdhShape" style="font-weight:800;margin:2px 0;">Open B (手)</div>
+            <div id="specNdhDetail" class="muted">掌心朝下 · 桌子參照面</div>
+          </div>
+          <div class="subcard">
+            <div id="specDhTitle" class="muted">主手（右手）</div>
+            <div id="specDhShape" style="font-weight:800;margin:2px 0;">Open O (果)</div>
+            <div id="specDhDetail" class="muted">掌心朝上 · 向下放置</div>
+          </div>
+        </div>
+
+        <!-- Deaf / User-Centered 4-Dimension Naturalness Evaluation (Ch8 Slide 26 + Ch10 Slide 18) -->
+        <div class="subcard space-y-sm" style="border-color:var(--primary);">
+          <div class="between">
+            <span style="font-size:13px;font-weight:700;">🤝 聾人使用者自然度評估（第 8 / 10 章）</span>
+            <button class="btn btn-sm" onclick="exportDeafEvalCsv()">匯出評估 CSV</button>
+          </div>
+          <div class="grid-2">
+            <div><label class="field-label">評估者編號</label><input id="evalUserId" type="text" value="D01" /></div>
+            <div>
+              <label class="field-label">身分背景</label>
+              <select id="evalUserRole">
+                <option value="聾人母語者">聾人母語者</option>
+                <option value="重聽／雙語使用者">重聽／雙語使用者</option>
+                <option value="手語教學者／研究者">手語教學者／研究者</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2" style="font-size:12px;">
+            <div><label class="field-label">① 語意正確 (1–5)</label><select id="evalSem"><option value="5">5 非常正確</option><option value="4">4 正確</option><option value="3">3 普通</option><option value="2">2 有誤</option><option value="1">1 錯誤</option></select></div>
+            <div><label class="field-label">② 手形與掌心 (1–5)</label><select id="evalForm"><option value="5">5 非常清楚</option><option value="4">4 清楚</option><option value="3">3 普通</option><option value="2">2 不夠準</option><option value="1">1 錯誤</option></select></div>
+            <div><label class="field-label">③ 時間與節奏 (1–5)</label><select id="evalTime"><option value="5">5 很流暢</option><option value="4">4 順暢</option><option value="3">3 普通</option><option value="2">2 略僵硬</option><option value="1">1 不連貫</option></select></div>
+            <div><label class="field-label">④ 整體自然度 (1–5)</label><select id="evalNat"><option value="5">5 非常自然</option><option value="4">4 自然</option><option value="3">3 普通</option><option value="2">2 不太自然</option><option value="1">1 難以理解</option></select></div>
+          </div>
+          <input id="evalComment" type="text" placeholder="給研究者的回饋（如：掌心角度、手形清楚度或改進建議）..." />
+          <div class="between">
+            <span id="evalStatusMsg" class="muted" style="font-size:11px;">已收錄 0 筆評估（有綁定 Google 試算表將同步上傳）</span>
+            <button class="btn btn-primary btn-sm" onclick="submitDeafEval()">儲存評估</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: AI SELF-LEARNING CENTER -->
+    <section id="tab-learn" class="hidden grid-12">
+      <div class="card col-6 space-y">
+        <div class="between">
+          <div>
+            <h2>A. 影片與語料自主訓練（MediaPipe ＋ DTW）</h2>
+            <p class="muted" style="margin:0;">上傳示範影片逐幀以 MediaPipe 擷取真實雙手骨架，並執行 DTW 時序原型訓練</p>
+          </div>
+          <span id="trainedModelBadge" class="pill">尚未訓練</span>
+        </div>
+
+        <div class="subcard space-y-sm" style="border-style:dashed;">
+          <div style="font-size:13px;font-weight:700;">① 上傳聾人受試者示範影片自動學習（MP4 / WebM / MOV）</div>
+          <div class="grid-3">
+            <input id="learnVidLabel" type="text" placeholder="標註句型，如：杯子放在桌子上" />
+            <select id="learnVidObjSelect"></select>
+            <input id="learnVidSignerId" type="text" value="D01" placeholder="語者 ID（如 D01）" />
+          </div>
+          <div class="row">
+            <label class="btn btn-sm" style="cursor:pointer;">
+              選擇示範影片逐幀解析學習
+              <input id="learnVideoInput" type="file" accept="video/*" class="hidden" onchange="handleLearnVideoUpload(event)" />
+            </label>
+            <span id="learnVidStatus" class="muted">本機版若 MediaPipe 已就緒，將直接從影片抽取真實雙手 42 點骨架</span>
+          </div>
+        </div>
+
+        <div class="subcard space-y-sm">
+          <div class="between">
+            <span style="font-size:12px;font-weight:700;">② 跨語者容錯度與骨架比例標準化</span>
+            <label style="font-size:12px;"><input id="chkNormScale" type="checkbox" checked onchange="updateToleranceConfig()" /> 手掌比例標準化</label>
+          </div>
+          <div class="grid-2">
+            <div>
+              <div class="between"><span class="muted">向下位移門檻 (Δy)</span><span id="tolDyVal" style="font-size:12px;font-family:monospace;font-weight:700;">0.08（標準）</span></div>
+              <input id="tolDySlider" type="range" min="4" max="15" value="8" style="width:100%;" oninput="updateToleranceConfig()" />
+            </div>
+            <div>
+              <div class="between"><span class="muted">接觸與手形寬容度</span><span id="tolContactVal" style="font-size:12px;font-family:monospace;font-weight:700;">中（±25%）</span></div>
+              <input id="tolContactSlider" type="range" min="15" max="45" value="25" style="width:100%;" oninput="updateToleranceConfig()" />
+            </div>
+          </div>
+        </div>
+
+        <div class="subcard space-y">
+          <div class="between">
+            <div>
+              <div style="font-size:13px;font-weight:700;">③ DTW 自主訓練與跨語者評測（Leave-One-Signer-Out）</div>
+              <div class="muted">用前幾位聾人訓練、測試陌生聾人，自動產出期末報告實驗數據</div>
+            </div>
+            <div class="row">
+              <button class="btn btn-primary btn-sm" onclick="trainSelfLearningModel()">⚡ 訓練模型</button>
+              <button class="btn btn-sm" onclick="runCrossSignerEvaluation()">📊 跨語者評測</button>
+            </div>
+          </div>
+          <div class="grid-3" style="text-align:center;">
+            <div class="card" style="padding:10px;"><div id="mlTrainCount" style="font-size:18px;font-weight:800;">—</div><div class="muted">樣本／語者</div></div>
+            <div class="card" style="padding:10px;"><div id="mlTrainAcc" style="font-size:18px;font-weight:800;color:var(--sage);">—</div><div class="muted">原型一致率</div></div>
+            <div class="card" style="padding:10px;"><div id="mlLearnedDy" style="font-size:18px;font-weight:800;">—</div><div class="muted">自學位移</div></div>
+          </div>
+          <div id="mlPrototypeReport" class="muted">尚未訓練模型。訓練完成後，分頁 3 辨識器將同步啟用 DTW 相似度評分。</div>
+          <div style="border-top:1px solid var(--border);padding-top:10px;" class="space-y-sm">
+            <div class="between">
+              <b style="font-size:12px;">多人聾人跨語者實驗結果</b>
+              <div class="row">
+                <button class="btn btn-sm" onclick="generateMultiSignerDemoCorpus()">＋ 模擬 3 位聾人 (D01~D03)</button>
+                <button id="btnExportLosoCsv" class="btn btn-sm" onclick="exportLosoReport()" disabled>匯出 CSV</button>
+              </div>
+            </div>
+            <div id="losoResultBox" class="card muted" style="padding:10px;">需要至少 2 位以上不同語者編號（如 D01、D02、D03）即可執行跨語者留一驗證。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col-6 space-y">
+        <div class="between">
+          <div>
+            <h2>B. AI 舉一反三自學新物件（人機協作審核）</h2>
+            <p class="muted" style="margin:0;">內建外形常識推論；也可選填 Gemini API Key 讓雲端大模型依你的規則推理任意新物件</p>
+          </div>
+          <span class="pill">Human-in-the-Loop</span>
+        </div>
+
+        <div class="subcard space-y-sm">
+          <div class="between">
+            <span style="font-size:12px;font-weight:700;">選配：連結 Gemini 大模型（免費申請 API Key，僅存於你本機瀏覽器）</span>
+            <span id="geminiKeyStatus" class="muted">使用內建離線常識引擎</span>
+          </div>
+          <div class="row">
+            <input id="geminiApiKeyInput" type="password" placeholder="（選填）貼上 Gemini API Key..." style="flex:1;" onchange="saveGeminiKey(this.value)" />
+            <button class="btn btn-sm" onclick="saveGeminiKey(document.getElementById('geminiApiKeyInput').value)">儲存 Key</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <input id="inferNounInput" type="text" placeholder="輸入辭典沒教過的新詞或句子，如：籃球放在桌子上、棉被、手機..." style="flex:1;" />
+          <button class="btn btn-primary btn-sm" onclick="runAiCommonsenseInference()">✨ AI 自主推論</button>
+        </div>
+
+        <div class="row">
+          <span class="muted">快速試試新詞：</span>
+          <button class="btn btn-sm" onclick="quickInfer('籃球放在桌子上')">籃球</button>
+          <button class="btn btn-sm" onclick="quickInfer('棉被放在桌子上')">棉被</button>
+          <button class="btn btn-sm" onclick="quickInfer('手機放在桌子上')">手機</button>
+          <button class="btn btn-sm" onclick="quickInfer('保溫瓶放在桌子上')">保溫瓶</button>
+          <button class="btn btn-sm" onclick="quickInfer('橘子放在桌子上')">橘子</button>
+          <button class="btn btn-sm" onclick="quickInfer('筷子放在桌子上')">筷子</button>
+        </div>
+
+        <div id="aiProposalCard" class="subcard hidden space-y-sm" style="border-color:var(--primary);">
+          <div class="between">
+            <b id="propTitle">AI 自學提案</b>
+            <span id="propConfidence" class="pill" style="color:var(--primary);">—</span>
+          </div>
+          <div id="propReasoning" class="card" style="padding:10px;font-size:12px;color:var(--muted);"></div>
+          <div class="grid-3">
+            <div><label class="field-label">審核／修正規則</label><select id="propRuleSelect"></select></div>
+            <div>
+              <label class="field-label">審核／修正手形</label>
+              <select id="propShapeSelect">
+                <option value="Open O">Open O (果)</option>
+                <option value="Bent 5">Bent 5 (同)</option>
+                <option value="Bent C">Bent C (紳)</option>
+                <option value="C">C (方)</option>
+                <option value="1">1 (一)</option>
+                <option value="Flat O">Flat O (萬)</option>
+                <option value="Open B">Open B (手) - 一般放</option>
+              </select>
+            </div>
+            <div><label class="field-label">掌心方向</label><select id="propPalmSelect"><option value="up">掌心朝上</option><option value="down">掌心朝下</option></select></div>
+          </div>
+          <div class="between">
+            <div class="row">
+              <button class="btn btn-primary btn-sm" onclick="approveAiProposal(false)">✅ 同意存入知識庫</button>
+              <button class="btn btn-sm" onclick="approveAiProposal(true)">✅ 存入並看卡通示範</button>
+            </div>
+            <button class="btn btn-sm" onclick="rejectAiProposal()">✕ 駁回</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="muted" style="font-weight:700;margin-bottom:6px;">AI 自主學習歷程紀錄（Audit Log）</div>
+          <div id="learningLogBox" class="subcard trace-box">尚無自學紀錄。</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Real MediaPipe Holistic Loader: Hands (42) + Face (478) + Pose (33) = 553 pts -->
+  <script type="module">
+    window.realMediaPipe = { ready: false, detector: null, faceDetector: null, poseDetector: null, FaceLandmarker: null };
+    const pill = document.getElementById('mpStatusPill');
+    pill.textContent = 'MediaPipe Holistic (553點) 載入中...';
+    try {
+      const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+      const { FilesetResolver, HandLandmarker, FaceLandmarker, PoseLandmarker } = vision;
+      const fileset = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+      );
+      const [handLandmarker, faceLandmarker, poseLandmarker] = await Promise.all([
+        HandLandmarker.createFromOptions(fileset, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'VIDEO',
+          numHands: 2,
+          minHandDetectionConfidence: 0.45,
+          minTrackingConfidence: 0.45
+        }),
+        FaceLandmarker.createFromOptions(fileset, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'VIDEO',
+          numFaces: 1,
+          outputFaceBlendshapes: true
+        }),
+        PoseLandmarker.createFromOptions(fileset, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+            delegate: 'GPU'
+          },
+          runningMode: 'VIDEO',
+          numPoses: 1
+        })
+      ]);
+      window.realMediaPipe = {
+        ready: true,
+        detector: handLandmarker,
+        faceDetector: faceLandmarker,
+        poseDetector: poseLandmarker,
+        FaceLandmarker
+      };
+      pill.textContent = 'Holistic 553點（臉＋姿＋手）就緒';
+      pill.style.color = '#2a8572';
+      pill.style.borderColor = '#2a8572';
+    } catch (err) {
+      pill.textContent = '離線／模擬 Holistic 模式就緒';
+    }
+  </script>
+
+  <script>
+    // =========================================================================
+    // REAL 3D LANDMARK GEOMETRY CLASSIFIER (HANDSHAPE + PALM ORIENTATION)
+    // =========================================================================
+    function dist3(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)); }
+
+    function detectPalmOrientation(landmarks, handLabel) {
+      // Cross product v1(wrist->indexMCP) x v2(wrist->pinkyMCP)
+      const w = landmarks[0], idx = landmarks[5], pnk = landmarks[17];
+      const v1 = { x: idx.x - w.x, y: idx.y - w.y, z: (idx.z || 0) - (w.z || 0) };
+      const v2 = { x: pnk.x - w.x, y: pnk.y - w.y, z: (pnk.z || 0) - (w.z || 0) };
+      let ny = v1.z * v2.x - v1.x * v2.z;
+      if (handLabel === 'Left') ny = -ny;
+      if (ny < -0.002) return 'up';
+      if (ny > 0.002) return 'down';
+      return 'in';
+    }
+
+    function classifyRealHandshape(lm) {
+      const palmLen = Math.max(0.05, dist3(lm[0], lm[9]));
+      const fPairs = [[5,6,8],[9,10,12],[13,14,16],[17,18,20]];
+      const curls = fPairs.map(([mcp, pip, tip]) => {
+        const direct = dist3(lm[0], lm[tip]) / palmLen;
+        return Math.max(0, Math.min(1, 1.95 - direct));
+      });
+      const avgCurl = curls.reduce((a, b) => a + b, 0) / 4;
+      const spread = (dist3(lm[8], lm[12]) + dist3(lm[12], lm[16]) + dist3(lm[16], lm[20])) / (3 * palmLen);
+      const aperture = dist3(lm[4], lm[8]) / palmLen;
+
+      if (curls[0] < 0.35 && curls[1] > 0.6 && curls[2] > 0.6 && curls[3] > 0.6) return '1';
+      if (avgCurl < 0.26 && spread < 0.44) return 'Open B';
+      if (avgCurl < 0.42 && spread < 0.28 && aperture > 0.28 && aperture < 0.65) return 'Bent C';
+      if ((spread >= 0.30 && aperture >= 0.46) || (spread >= 0.38 && avgCurl >= 0.22)) return 'Bent 5';
+      if (aperture >= 0.46 && spread < 0.32) return 'C';
+      if (aperture < 0.20) return 'Flat O';
+      return 'Open O';
+    }
+
+    // =========================================================================
+    // CORE DATA & APP LOGIC (SHARED WITH STUDIO VERSION)
+    // =========================================================================
+    const HANDSHAPE_SPECS = {
+      'Open B': { zh: '手', category: '平面／一般放', curl: [0.05,0.05,0.05,0.05], thumbCurl: 0.12, spread: 0.12, aperture: 0.18 },
+      'Open O': { zh: '果', category: '中小圓形', curl: [0.46,0.48,0.50,0.52], thumbCurl: 0.40, spread: 0.18, aperture: 0.36 },
+      'Bent 5': { zh: '同', category: '大圓球體', curl: [0.44,0.46,0.48,0.50], thumbCurl: 0.34, spread: 0.82, aperture: 0.72 },
+      'Bent C': { zh: '紳', category: '扁平四方形', curl: [0.16,0.16,0.18,0.20], thumbCurl: 0.18, spread: 0.08, aperture: 0.42, flatClamp: true },
+      'C':      { zh: '方', category: '圓柱體', curl: [0.42,0.44,0.46,0.48], thumbCurl: 0.30, spread: 0.10, aperture: 0.58 },
+      '1':      { zh: '一', category: '細長條狀', curl: [0.05,0.88,0.90,0.90], thumbCurl: 0.70, spread: 0.12, aperture: 0.22 },
+      'Flat O': { zh: '萬', category: '扁小捏持', curl: [0.22,0.22,0.24,0.26], thumbCurl: 0.24, spread: 0.06, aperture: 0.12 }
+    };
+
+    const DEFAULT_RULES = [
+      { id: 'rule_1', code: '規則一', name: '獨立使用一般詞彙「放」', condition: '物件無固定外形（衣服、毛巾等）', coMode: 'lexical_put', desc: '使用一般詞彙 8-084 放：雙手平掌掌心朝上，主手由上往下疊放於非主手掌心。' },
+      { id: 'rule_2', code: '規則二', name: '直接套用前者詞彙手式（共構）', condition: '原詞彙末尾手形可直接代表外形（蘋果＝紅＋水果 Open O）', coMode: 'simultaneous_down', desc: '非主手保持 Open B 掌心朝下（桌子），主手沿用前詞手形（Open O 掌心朝上）向下放置。' },
+      { id: 'rule_3', code: '規則三', name: '依事物外形選用代形詞（共構）', condition: '原詞無可直接沿用手形，依外形大小切換（西瓜 Bent 5、書 Bent C、杯子 C、筆 1）', coMode: 'simultaneous_down', desc: '非主手保持 Open B 掌心朝下（桌子），主手依外形切換代形詞掌心朝上向下放置。' }
+    ];
+
+    const DEFAULT_OBJECTS = [
+      { id: 'obj_apple', name: '蘋果', shapeDesc: '中小圓形', lexicalGloss: '紅＋水果 (Open O)', ruleId: 'rule_2', handshape: 'Open O', palm: 'up', ndhMode: 'Open B_down', note: '沿用水果手式 Open O 掌心朝上，放於非主手 Open B 上' },
+      { id: 'obj_watermelon', name: '西瓜', shapeDesc: '大圓球形', lexicalGloss: '西瓜（無現成手式）', ruleId: 'rule_3', handshape: 'Bent 5', palm: 'up', ndhMode: 'Open B_down', note: '外形比蘋果大，改用張開的 Bent 5 掌心朝上，放於非主手 Open B 上' },
+      { id: 'obj_book', name: '書', shapeDesc: '四方形', lexicalGloss: '書本', ruleId: 'rule_3', handshape: 'Bent C', palm: 'up', ndhMode: 'Open B_down', note: '比完書本後切換四方手式 Bent C 掌心朝上，放於非主手 Open B 上' },
+      { id: 'obj_clothes', name: '衣服', shapeDesc: '無固定形狀', lexicalGloss: '衣服＋獨立放 (8-084)', ruleId: 'rule_1', handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '無固定外形，使用一般詞彙 8-084 放（雙手掌心朝上疊放）' },
+      { id: 'obj_cup', name: '杯子', shapeDesc: '圓柱形', lexicalGloss: '杯子', ruleId: 'rule_3', handshape: 'C', palm: 'up', ndhMode: 'Open B_down', note: '依圓柱外形選用 C 放於非主手 Open B 上' },
+      { id: 'obj_pen', name: '筆', shapeDesc: '細長條狀', lexicalGloss: '筆', ruleId: 'rule_3', handshape: '1', palm: 'up', ndhMode: 'Open B_down', note: '依細長外形選用 1 放於非主手 Open B 上' }
+    ];
+
+    let state = {
+      handedness: 'right',
+      activeTab: 'record',
+      rules: JSON.parse(JSON.stringify(DEFAULT_RULES)),
+      objects: JSON.parse(JSON.stringify(DEFAULT_OBJECTS)),
+      samples: [],
+      recSource: 'sim',
+      isRecording: false,
+      recStream: null,
+      mediaRecorder: null,
+      recVideoChunks: [],
+      lastVideoBlob: null,
+      lastLandmarks: [],
+      lastLiveFrame: null,
+      recStartTime: 0,
+      recFrameTimer: null,
+      recogFrames: [],
+      recogMeta: null,
+      recogFrameIdx: 0,
+      recogAnimId: null,
+      avatarPlan: null,
+      avatarProgress: 0,
+      avatarPlaying: true,
+      avatarSpeed: 1,
+      avatarLastTs: 0
+    };
+
+    const DB_NAME = 'TSL_PUT_LOCAL_DB_V1';
+    let idb = null;
+    function openDatabase() {
+      return new Promise(resolve => {
+        if (!window.indexedDB) return resolve(null);
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = e => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('samples')) db.createObjectStore('samples', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('config')) db.createObjectStore('config', { keyPath: 'key' });
+        };
+        req.onsuccess = e => { idb = e.target.result; resolve(idb); };
+        req.onerror = () => resolve(null);
+      });
+    }
+    const idbPut = (st, val) => new Promise(res => { if (!idb) return res(); const tx = idb.transaction(st, 'readwrite'); tx.objectStore(st).put(val); tx.oncomplete = res; });
+    const idbDelete = (st, k) => new Promise(res => { if (!idb) return res(); const tx = idb.transaction(st, 'readwrite'); tx.objectStore(st).delete(k); tx.oncomplete = res; });
+    const idbGetAll = (st) => new Promise(res => { if (!idb) return res([]); const tx = idb.transaction(st, 'readonly'); const r = tx.objectStore(st).getAll(); r.onsuccess = () => res(r.result || []); });
+    async function persistConfig() { await idbPut('config', { key: 'rules', data: state.rules }); await idbPut('config', { key: 'objects', data: state.objects }); }
+
+    const HAND_CONNECTIONS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+    function generateHand21(cx, cy, shapeName, palm, isRight, scale = 1.0) {
+      const spec = HANDSHAPE_SPECS[shapeName] || HANDSHAPE_SPECS['Open O'];
+      const dir = isRight ? -1 : 1;
+      const wx = cx - dir * 0.055 * scale, wy = cy + 0.015 * scale;
+      const pts = [{ x: wx, y: wy, z: 0 }];
+      const pf = palm === 'up' ? -1 : 1;
+      const tOpen = 0.045 + spec.aperture * 0.055;
+      pts.push({ x: wx + dir * 0.018 * scale, y: wy + pf * 0.012 * scale, z: -0.02 * pf });
+      pts.push({ x: wx + dir * 0.036 * scale, y: wy + pf * 0.022 * scale, z: -0.03 * pf });
+      pts.push({ x: wx + dir * 0.050 * scale, y: wy + (pf * 0.028 - tOpen * 0.25) * scale, z: -0.035 * pf });
+      pts.push({ x: wx + dir * 0.064 * scale, y: wy + (pf * 0.02 - tOpen * 0.35) * scale, z: -0.04 * pf });
+      const baseOff = [-0.026, -0.008, 0.010, 0.028], lens = [0.072, 0.078, 0.072, 0.058];
+      for (let f = 0; f < 4; f++) {
+        const curl = spec.curl[f], sp = baseOff[f] * (1 + spec.spread * 1.45);
+        const mcpX = wx + dir * 0.052 * scale, mcpY = wy + sp * 0.7 * scale;
+        const seg = lens[f] / 3 * scale, bendY = spec.flatClamp ? 0.018 * scale : curl * 0.045 * scale * pf, reach = 1 - curl * 0.58;
+        const pipX = mcpX + dir * seg * reach, pipY = mcpY + sp * 0.3 * scale + bendY * 0.45;
+        const dipX = pipX + dir * seg * reach * 0.9, dipY = pipY + sp * 0.2 * scale + bendY * 0.85;
+        const tipX = dipX + dir * seg * reach * 0.75, tipY = dipY + bendY * 1.15;
+        pts.push({ x: mcpX, y: mcpY, z: 0 }, { x: pipX, y: pipY, z: 0 }, { x: dipX, y: dipY, z: 0 }, { x: tipX, y: tipY, z: 0 });
+      }
+      return pts;
+    }
+
+    function synthesizeSequence(scenario, fps = 15, durationSec = 2.5) {
+      const total = Math.round(fps * durationSec), frames = [];
+      const dhIsRight = state.handedness === 'right';
+      const obj = state.objects.find(o => o.id === scenario.objectId) || state.objects[0];
+      const isNeg = Boolean(scenario.isNegative), isLex = obj.ruleId === 'rule_1' && !isNeg;
+      const ndhX = dhIsRight ? 0.44 : 0.56, ndhY = 0.65, dhXBase = dhIsRight ? 0.53 : 0.47;
+      for (let i = 0; i < total; i++) {
+        const t = i / Math.max(1, total - 1);
+        let dhX = dhXBase, dhY = 0.40, dhShape = obj.handshape, dhPalm = obj.palm, ndhPresent = true, phase = 'noun';
+        const ndhPalm = isLex ? 'up' : 'down';
+        if (isNeg && scenario.negativeType === 'static_noun') {
+          ndhPresent = false; dhX = dhXBase + Math.sin(t * Math.PI * 2) * 0.03; dhY = 0.44; phase = 'noun_only';
+        } else if (isNeg && scenario.negativeType === 'sideways_wave') {
+          dhX = dhXBase + Math.sin(t * Math.PI * 2) * 0.14; dhY = 0.36; phase = 'unrelated_motion';
+        } else if (t < 0.30) {
+          phase = 'table'; dhShape = 'Open B'; dhPalm = 'down'; dhY = 0.55 - 0.12 * (t / 0.30);
+        } else if (t < 0.58) {
+          phase = 'noun'; dhY = 0.40 - 0.04 * Math.sin(((t - 0.30) / 0.28) * Math.PI);
+        } else if (t < 0.86) {
+          phase = 'put_down'; const p = (t - 0.58) / 0.28; const ease = p < 0.5 ? 2*p*p : 1 - Math.pow(-2*p+2, 2)/2;
+          dhX = dhXBase + (ndhX - dhXBase) * 0.48 * ease; dhY = 0.40 + (ndhY - 0.055 - 0.40) * ease;
+        } else {
+          phase = 'put_hold'; dhX = dhXBase + (ndhX - dhXBase) * 0.48; dhY = ndhY - 0.055;
+        }
+        frames.push({
+          frameIndex: i, timestampMs: Math.round((i / fps) * 1000), phase, handedness: state.handedness,
+          dominant: { side: dhIsRight ? 'Right' : 'Left', handshape: dhShape, palm: dhPalm, wrist: { x: dhX, y: dhY }, landmarks: generateHand21(dhX, dhY, dhShape, dhPalm, dhIsRight, 1.05) },
+          nonDominant: ndhPresent ? { side: dhIsRight ? 'Left' : 'Right', handshape: 'Open B', palm: ndhPalm, wrist: { x: ndhX, y: ndhY }, landmarks: generateHand21(ndhX, ndhY, 'Open B', ndhPalm, !dhIsRight, 1.05) } : null
+        });
+      }
+      return frames;
+    }
+
+    function getPalmCenter(hand) {
+      if (!hand) return null;
+      if (hand.landmarks && hand.landmarks.length > 9) {
+        return {
+          x: (hand.landmarks[0].x + hand.landmarks[9].x * 2) / 3,
+          y: (hand.landmarks[0].y + hand.landmarks[9].y * 2) / 3
+        };
+      }
+      return hand.wrist || null;
+    }
+
+    function majorityVote(arr, fallback) {
+      if (!arr.length) return fallback;
+      const counts = new Map();
+      for (const v of arr) counts.set(v, (counts.get(v) || 0) + 1);
+      let best = fallback, maxC = -1;
+      for (const [k, c] of counts.entries()) { if (c > maxC) { maxC = c; best = k; } }
+      return best;
+    }
+
+    function analyzeLandmarkSequence(frames, contextObjectId) {
+      if (!frames || frames.length < 5) return { isPut: false, sentence: '影格過少', trace: ['影格不足'] };
+      const trace = [];
+      const ctxObj = state.objects.find(o => o.id === contextObjectId) || null;
+      const tol = state.tolerance || { dyMin: 0.08, contactRatio: 0.25, normalizeScale: true };
+      const realLive = frames.filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
+      const sourceFrames = realLive.length >= 5 ? realLive : frames;
+      const valid = sourceFrames.filter(f => f && f.dominant);
+      if (valid.length < 5) return { isPut: false, sentence: '未偵測到足夠主手影格', trace: ['主手影格不足'] };
+
+      // 1. Sliding Peak-to-Contact Window Detection using PALM CENTER (Landmark 9), not wrist!
+      const searchStart = Math.floor(valid.length * 0.25);
+      let bestIdx = valid.length - 1;
+      let bestDist = Infinity;
+      let dualCount = 0;
+
+      for (let i = searchStart; i < valid.length; i++) {
+        const f = valid[i];
+        if (!f.nonDominant) continue;
+        dualCount++;
+        const dp = getPalmCenter(f.dominant);
+        const np = getPalmCenter(f.nonDominant);
+        const hx = Math.abs(dp.x - np.x);
+        const vy = np.y - dp.y; // > 0 when DH is above NDH, ~0 when stacked palm-on-palm
+        // Prefer PUT landing frames (only penalize palm-down Open B '桌子' pose; allow Bent 5/C/1 with palm in/up/down!)
+        const vertPenalty = vy < -0.08 ? Math.abs(vy + 0.08) * 2.5 : Math.abs(vy - 0.04);
+        const isTablePose = (f.dominant.handshape === 'Open B' && f.dominant.palm === 'down');
+        const palmPenalty = isTablePose ? 0.22 : (f.dominant.palm === 'up' || f.dominant.palm === 'in' ? 0 : 0.03);
+        const score = Math.hypot(hx, vertPenalty) + palmPenalty;
+        if (score < bestDist) {
+          bestDist = score;
+          bestIdx = i;
+        }
+      }
+
+      const dualRatio = dualCount / Math.max(1, valid.length - searchStart);
+      // Local contact window around the detected landing frame (avoids penalizing earlier noun movements!)
+      const winStart = Math.max(0, bestIdx - 6);
+      const winEnd = Math.min(valid.length - 1, bestIdx + 5);
+      const contactWin = valid.slice(winStart, winEnd + 1);
+      const ndhWin = contactWin.filter(f => f.nonDominant);
+
+      // ① NDH stability & handshape inside contact window (median step resists end-of-clip hand drop!)
+      let ndhHoldScore = 0, ndhPalm = 'none', ndhShape = '無';
+      if (ndhWin.length >= 2) {
+        const steps = [];
+        for (let i = 1; i < ndhWin.length; i++) {
+          const p0 = getPalmCenter(ndhWin[i - 1].nonDominant);
+          const p1 = getPalmCenter(ndhWin[i].nonDominant);
+          steps.push(Math.hypot(p1.x - p0.x, p1.y - p0.y));
+        }
+        steps.sort((a, b) => a - b);
+        const medMv = steps[Math.floor(steps.length * 0.5)];
+        ndhHoldScore = Math.max(0, Math.min(100, Math.round((1 - medMv * 24) * 100)));
+        ndhPalm = majorityVote(ndhWin.map(f => f.nonDominant.palm), ndhWin[ndhWin.length - 1].nonDominant.palm);
+        ndhShape = majorityVote(ndhWin.map(f => f.nonDominant.handshape), 'Open B');
+      }
+      trace.push(ndhWin.length >= 2
+        ? `① 非主手（接觸視窗 #${bestIdx + 1}）：${ndhShape}（掌心${ndhPalm === 'down' ? '朝下＝桌子' : ndhPalm === 'up' ? '朝上＝一般放底掌' : '朝側'}），穩定度 ${ndhHoldScore}%`
+        : '① 非主手：未偵測到雙手共構參照平面');
+
+      // ② DH handshape & palm orientation by majority vote around landing
+      const dhShape = majorityVote(contactWin.map(f => f.dominant.handshape), valid[bestIdx].dominant.handshape);
+      const dhPalm = majorityVote(contactWin.map(f => f.dominant.palm), valid[bestIdx].dominant.palm);
+      const spec = HANDSHAPE_SPECS[dhShape] || HANDSHAPE_SPECS['Open O'];
+      trace.push(`② 主手手形：${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'} · ${spec.category}`);
+
+      // ③ Peak-to-Contact downward placement trajectory & palm-center overlap
+      const lookbackStart = Math.max(0, bestIdx - 32);
+      let minDhY = 1.0;
+      for (let i = lookbackStart; i <= bestIdx; i++) {
+        const py = getPalmCenter(valid[i].dominant).y;
+        if (py < minDhY) minDhY = py;
+      }
+      const contactDh = getPalmCenter(valid[bestIdx].dominant);
+      const contactNdh = valid[bestIdx].nonDominant ? getPalmCenter(valid[bestIdx].nonDominant) : null;
+      const peakDropDy = contactDh.y - minDhY;
+
+      // Landing deceleration check near contact frame
+      const holdSlice = valid.slice(Math.max(0, bestIdx - 2), Math.min(valid.length, bestIdx + 5));
+      let tailMove = 0;
+      for (let i = 1; i < holdSlice.length; i++) {
+        const p0 = getPalmCenter(holdSlice[i - 1].dominant);
+        const p1 = getPalmCenter(holdSlice[i].dominant);
+        tailMove += Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      }
+      const avgTailMove = tailMove / Math.max(1, holdSlice.length - 1);
+      const hasHold = avgTailMove < 0.036 * (1 + tol.contactRatio);
+
+      // Check palm-center proximity (wider vertical/horizontal clearance for big classifiers like Bent 5 watermelon & C cup!)
+      const isClassifierShape = (dhShape !== 'Open B');
+      let nearNdh = false, hx = 1, vy = 1;
+      if (contactNdh) {
+        hx = Math.abs(contactDh.x - contactNdh.x);
+        vy = contactNdh.y - contactDh.y;
+        const hxLim = (isClassifierShape ? 0.175 : 0.145) * (1 + tol.contactRatio);
+        const vyLim = (isClassifierShape ? 0.225 : 0.145) * (1 + tol.contactRatio);
+        nearNdh = hx < hxLim && vy >= -0.075 && vy <= vyLim;
+      }
+
+      // Recognize both simultaneous classifier PUT (allowing palm up/in/dome for Bent 5, C, 1, Bent C) and lexical 8-084 PUT
+      const isLexicalStack = (ndhPalm === 'up' && dhPalm === 'up' && dhShape === 'Open B' && nearNdh && hx < 0.145 * (1 + tol.contactRatio));
+      const effectiveDyMin = isLexicalStack
+        ? Math.max(0.03, tol.dyMin * 0.45)
+        : (isClassifierShape && nearNdh && hasHold ? Math.max(0.045, tol.dyMin * 0.68) : tol.dyMin);
+      const hasDownward = peakDropDy >= effectiveDyMin;
+
+      let trajScore = (hasDownward ? 45 : (isLexicalStack && nearNdh ? 35 : 0)) + (hasHold ? 25 : 0) + (nearNdh ? 30 : 0);
+      const minHold = Math.max(45, Math.round(68 - tol.contactRatio * 40));
+      const validDhPalm = isClassifierShape ? true : (dhPalm === 'up' || (dhPalm === 'in' && ndhPalm === 'down'));
+      const isPut = (ndhWin.length >= 2) && (ndhHoldScore >= minHold) && nearNdh && (trajScore >= 75 || (isLexicalStack && hasHold)) && validDhPalm;
+
+      trace.push(isPut
+        ? `③ 軌跡與掌心接觸：掌心水平距 ${hx.toFixed(2)}、垂直高差 ${vy.toFixed(2)}、向下 Δy=+${peakDropDy.toFixed(2)}（門檻 ${effectiveDyMin.toFixed(2)}）→ 確認為「放」！`
+        : `③ 軌跡與掌心接觸：未達放置條件（手形 ${dhShape}/${dhPalm}，非主手穩 ${ndhHoldScore}%，hx=${hx.toFixed(2)}, vy=${vy.toFixed(2)}, Δy=${peakDropDy.toFixed(2)}）→ 非「放」動作`);
+
+      // 0. Optional Blind 3-Slot Word Lexicon Recognition on prefix BEFORE PUT contact window!
+      const blindMode = Boolean(document.getElementById('chkBlindMode')?.checked);
+      const wordNouns = state.samples.filter(s => s.clipType === 'word_noun' && s.frames?.length >= 4);
+      const wordLocs = state.samples.filter(s => s.clipType === 'word_loc' && s.frames?.length >= 4);
+      let blindNoun = null, blindLoc = null;
+
+      if (valid.length >= 12 && (wordNouns.length || wordLocs.length)) {
+        const preEnd = Math.max(6, bestIdx - 6);
+        const prefix = valid.slice(0, preEnd);
+        const segA = prefix.slice(0, Math.max(4, Math.floor(prefix.length * 0.58)));
+        const segB = prefix.slice(Math.max(0, Math.floor(prefix.length * 0.42)));
+
+        if (wordNouns.length) {
+          const mA = matchWordLexicon(segA, wordNouns);
+          const mB = matchWordLexicon(segB, wordNouns);
+          blindNoun = (mA && (!mB || mA.distance <= mB.distance)) ? mA : mB;
+        }
+        if (wordLocs.length) {
+          const lA = matchWordLexicon(segA, wordLocs);
+          const lB = matchWordLexicon(segB, wordLocs);
+          blindLoc = (lB && (!lA || lB.distance <= lA.distance)) ? lB : lA;
+        }
+        if (blindNoun) trace.unshift(`🔍 盲測前段單詞庫辨識（結合姿勢＋雙手）：名詞「${blindNoun.word}」(相似度 ${blindNoun.similarity}%)${blindLoc ? ` ＋ 處所「${blindLoc.word}」(${blindLoc.similarity}%)` : ''}`);
+      } else if (blindMode) {
+        trace.unshift('💡 盲測提示：你尚未錄製「單詞教學（名詞／處所）」樣本；先到第 1 分頁錄製單字「西瓜／衣服／桌子」後，AI 即可完全免提示辨識前半句！');
+      }
+
+      let matchedRule = null, matchedObj = (blindMode && blindNoun)
+        ? (state.objects.find(o => o.id === blindNoun.objectId || o.name === blindNoun.word) || ctxObj)
+        : (blindMode ? null : ctxObj);
+      let ruleScore = 18, sentence = '';
+      const locName = blindLoc ? blindLoc.word : '桌子';
+
+      if (isPut) {
+        if (ndhPalm === 'up' && dhShape === 'Open B') {
+          matchedRule = state.rules.find(r => r.coMode === 'lexical_put') || state.rules[0];
+          if (!matchedObj) matchedObj = state.objects.find(o => o.ruleId === matchedRule.id) || ctxObj || state.objects[3];
+        } else {
+          if (!matchedObj) matchedObj = state.objects.find(o => o.handshape === dhShape && o.ndhMode === 'Open B_down') || ctxObj;
+          if (!matchedObj && dhShape === 'Open B' && ndhPalm === 'down') {
+            const preShapes = valid.slice(0, Math.max(4, bestIdx)).map(f => f.dominant.handshape).filter(sh => sh && sh !== 'Open B');
+            const preShape = majorityVote(preShapes, null);
+            if (preShape) matchedObj = state.objects.find(o => o.handshape === preShape && o.ndhMode === 'Open B_down') || null;
+          }
+          matchedRule = matchedObj ? (state.rules.find(r => r.id === matchedObj.ruleId) || state.rules[2]) : state.rules[2];
+        }
+        ruleScore = 95;
+        const nounName = blindNoun ? blindNoun.word : (matchedObj ? matchedObj.name : spec.category);
+        sentence = `${nounName}放在${locName}上`;
+        trace.push(`④ 規則驗證：命中【${matchedRule.code}：${matchedRule.name}】→ 輸出句子：「${sentence}」`);
+      } else {
+        const nounName = blindNoun ? blindNoun.word : (ctxObj ? ctxObj.name : dhShape);
+        sentence = `非「放」動作（僅偵測到 ${nounName}）`;
+        trace.push('⚠️ 未偵測到雙手掌心向下放置接觸，排除為非放置詞彙。');
+      }
+      if (state.trainedModel && state.trainedModel.prototypes?.length) {
+        const dtw = matchWithTrainedModel(frames);
+        if (dtw) trace.push(`⚡ 自學 DTW 模型：最接近「${dtw.label}」(${dtw.handshape})，時序相似度 ${dtw.similarity}%`);
+      }
+      return {
+        isPut, sentence, ndhHoldScore,
+        ndhSummary: ndhWin.length >= 2 ? `${ndhShape} · 掌心${ndhPalm === 'down' ? '朝下(桌子)' : ndhPalm === 'up' ? '朝上(一般放)' : '朝側'}` : '無非主手參照',
+        dhShape, dhSummary: `${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
+        shapeScore: 92, trajScore, trajSummary: isPut ? `掌心重疊接觸 · 向下 Δy=+${peakDropDy.toFixed(2)}` : `Δy=${peakDropDy.toFixed(2)} · 掌心距 ${hx.toFixed(2)}`,
+        ruleScore, ruleSummary: matchedRule ? `${matchedRule.code}：${matchedRule.name}` : '未觸發放規則', matchedRule, trace
+      };
+    }
+
+    // Body-relative Pose+Hands feature extractor for Single-Word Lexicon DTW matching!
+    function extractBodyRelativeWordSeq(frames, targetLen = 14) {
+      if (!frames || !frames.length) return [];
+      const seq = [];
+      for (let i = 0; i < targetLen; i++) {
+        const idx = Math.min(frames.length - 1, Math.floor((i / Math.max(1, targetLen - 1)) * (frames.length - 1)));
+        const f = frames[idx], dh = f.dominant, ndh = f.nonDominant, pose = f.pose;
+        const hs = HANDSHAPE_SPECS[dh?.handshape] || HANDSHAPE_SPECS['Open O'];
+        const shMidX = pose?.shMid?.x ?? 0.5, shMidY = pose?.shMid?.y ?? 0.58;
+        const shW = Math.max(0.12, pose?.shWidth ?? 0.28);
+        const noseY = pose?.nose?.y ?? 0.30;
+        const dhC = getPalmCenter(dh) || { x: 0.5, y: 0.5 };
+        const ndhC = getPalmCenter(ndh);
+        seq.push([
+          (dhC.x - shMidX) / shW,
+          (dhC.y - shMidY) / shW,
+          (dhC.y - noseY) / shW, // distinguishes face/lip signs (蘋果/杯子) vs chest signs (衣服/西瓜)!
+          ndhC ? 1 : 0,
+          ndhC ? (ndhC.x - shMidX) / shW : 0,
+          ndhC ? (ndhC.y - shMidY) / shW : 0,
+          hs.curl.reduce((a, b) => a + b, 0) / 4,
+          hs.spread,
+          hs.aperture
+        ]);
+      }
+      return seq;
+    }
+
+    function matchWordLexicon(framesSlice, wordSamples) {
+      if (!framesSlice?.length || !wordSamples?.length) return null;
+      const qSeq = extractBodyRelativeWordSeq(framesSlice, 14);
+      let best = null, bestDist = Infinity;
+      for (const s of wordSamples) {
+        const refSeq = extractBodyRelativeWordSeq(s.frames, 14);
+        const d = dtwDistance(qSeq, refSeq);
+        if (d < bestDist) { bestDist = d; best = s; }
+      }
+      if (!best) return null;
+      const sim = Math.max(0, Math.min(99, Math.round(Math.exp(-bestDist * 0.9) * 100)));
+      return { word: best.label, objectId: best.objectId, distance: bestDist, similarity: sim };
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      const rr = Math.min(r, w/2, h/2);
+      ctx.beginPath(); ctx.moveTo(x+rr, y); ctx.arcTo(x+w, y, x+w, y+h, rr); ctx.arcTo(x+w, y+h, x, y+h, rr); ctx.arcTo(x, y+h, x, y, rr); ctx.arcTo(x, y, x+w, y, rr); ctx.closePath();
+    }
+
+    // =========================================================================
+    // HOLISTIC VISUALIZATION: VIEWFINDER + FACE MESH (478pt) + POSE (33pt) + HANDS (42pt)
+    // =========================================================================
+    const POSE_UPPER_CONNECTIONS = [
+      [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+      [11, 23], [12, 24], [23, 24],
+      [8, 6], [6, 5], [5, 4], [4, 0], [0, 1], [1, 2], [2, 3], [3, 7]
+    ];
+
+    function drawViewfinderCorners(ctx, W, H) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(220, 230, 238, 0.35)';
+      ctx.lineWidth = 1.6;
+      const m = 24, len = 22;
+      [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]].forEach(([x, y, dx, dy]) => {
+        ctx.beginPath();
+        ctx.moveTo(x + dx * len, y); ctx.lineTo(x, y); ctx.lineTo(x, y + dy * len);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    function drawHolisticStatusPill(ctx, handCount, faceCount, poseCount) {
+      ctx.save();
+      const bx = 18, by = 48, bw = 248, bh = 28;
+      ctx.fillStyle = 'rgba(10, 14, 17, 0.78)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, bx, by, bw, bh, 8);
+      ctx.fill(); ctx.stroke();
+
+      ctx.font = '600 11.5px sans-serif';
+      const items = [
+        { col: '#f5b841', txt: handCount ? `手部 ${handCount}` : '手部 未偵測', x: bx + 14 },
+        { col: '#ef6452', txt: `臉部 ${faceCount}`, x: bx + 108 },
+        { col: '#3be0c2', txt: `姿勢 ${poseCount}`, x: bx + 178 }
+      ];
+      items.forEach(it => {
+        ctx.fillStyle = it.col;
+        ctx.beginPath(); ctx.arc(it.x, by + bh / 2, 3.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e8eef2';
+        ctx.fillText(it.txt, it.x + 8, by + bh / 2 + 4);
+      });
+      ctx.restore();
+    }
+
+    function drawPoseSkeleton(ctx, posePts, W, H) {
+      if (!posePts || posePts.length < 25) return;
+      ctx.save();
+      ctx.strokeStyle = '#3be0c2';
+      ctx.lineWidth = 2.6;
+      ctx.lineCap = 'round';
+      for (const [a, b] of POSE_UPPER_CONNECTIONS) {
+        const pA = posePts[a], pB = posePts[b];
+        if (!pA || !pB) continue;
+        ctx.beginPath(); ctx.moveTo(pA.x * W, pA.y * H); ctx.lineTo(pB.x * W, pB.y * H); ctx.stroke();
+      }
+      [0, 11, 12, 13, 14, 15, 16, 23, 24].forEach(i => {
+        const p = posePts[i];
+        if (!p) return;
+        ctx.beginPath(); ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#3be0c2'; ctx.lineWidth = 1.6;
+        ctx.arc(p.x * W, p.y * H, 3.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    function drawRealFaceMesh(ctx, facePts, W, H) {
+      if (!facePts || facePts.length < 400) return;
+      const FL = window.realMediaPipe?.FaceLandmarker;
+      ctx.save();
+      // Cyan triangular tesselation mesh
+      if (FL?.FACE_LANDMARKS_TESSELATION) {
+        ctx.strokeStyle = 'rgba(92, 198, 224, 0.30)';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        for (const c of FL.FACE_LANDMARKS_TESSELATION) {
+          const a = facePts[c.start], b = facePts[c.end];
+          if (!a || !b) continue;
+          ctx.moveTo(a.x * W, a.y * H); ctx.lineTo(b.x * W, b.y * H);
+        }
+        ctx.stroke();
+      }
+      // Coral face oval, eyebrows, eyes & lips contours (exact style of reference screenshot!)
+      const contourSets = [
+        FL?.FACE_LANDMARKS_FACE_OVAL,
+        FL?.FACE_LANDMARKS_LIPS,
+        FL?.FACE_LANDMARKS_LEFT_EYE,
+        FL?.FACE_LANDMARKS_RIGHT_EYE,
+        FL?.FACE_LANDMARKS_LEFT_EYEBROW,
+        FL?.FACE_LANDMARKS_RIGHT_EYEBROW
+      ].filter(Boolean);
+      ctx.strokeStyle = '#e56852';
+      ctx.lineWidth = 1.45;
+      ctx.beginPath();
+      for (const set of contourSets) {
+        for (const c of set) {
+          const a = facePts[c.start], b = facePts[c.end];
+          if (!a || !b) continue;
+          ctx.moveTo(a.x * W, a.y * H); ctx.lineTo(b.x * W, b.y * H);
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Compact schematic Face Mesh + Upper-Body Pose for playback & sim mode (when full 478pts aren't in memory)
+    function drawCompactHolisticBackdrop(ctx, W, H, poseMeta, faceMeta) {
+      const cx = (poseMeta?.nose?.x ?? 0.5) * W;
+      const cy = (poseMeta?.nose?.y ?? 0.32) * H;
+      const shY = (poseMeta?.shMid?.y ?? 0.64) * H;
+      const shHalf = ((poseMeta?.shWidth ?? 0.34) * W) / 2;
+
+      // Upper-body Pose lines in mint teal
+      ctx.save();
+      ctx.strokeStyle = '#3be0c2';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(cx - shHalf, shY); ctx.lineTo(cx + shHalf, shY);
+      ctx.moveTo(cx - shHalf, shY); ctx.lineTo(cx - shHalf - 24, H * 0.96);
+      ctx.moveTo(cx - shHalf, shY); ctx.lineTo(cx - shHalf + 18, H * 0.96);
+      ctx.moveTo(cx + shHalf, shY); ctx.lineTo(cx + shHalf + 24, H * 0.96);
+      ctx.moveTo(cx + shHalf, shY); ctx.lineTo(cx + shHalf - 18, H * 0.96);
+      ctx.stroke();
+      [[cx - shHalf, shY], [cx + shHalf, shY]].forEach(([px, py]) => {
+        ctx.beginPath(); ctx.fillStyle = '#fff'; ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+      });
+
+      // Cyan Face Mesh Grid inside oval + Coral contours
+      const rx = 50, ry = 66;
+      ctx.strokeStyle = 'rgba(92, 198, 224, 0.32)';
+      ctx.lineWidth = 0.85;
+      for (let i = -3; i <= 3; i++) {
+        const dx = i * 14;
+        const hSpan = Math.sqrt(Math.max(0, 1 - (dx / rx) ** 2)) * ry;
+        ctx.beginPath(); ctx.moveTo(cx + dx, cy - hSpan); ctx.lineTo(cx + dx, cy + hSpan); ctx.stroke();
+      }
+      for (let j = -4; j <= 4; j++) {
+        const dy = j * 14;
+        const wSpan = Math.sqrt(Math.max(0, 1 - (dy / ry) ** 2)) * rx;
+        ctx.beginPath(); ctx.moveTo(cx - wSpan, cy + dy); ctx.lineTo(cx + wSpan, cy + dy); ctx.stroke();
+      }
+      // Coral oval, eyebrows, eyes, lips
+      const browLift = (faceMeta?.browUp || 0) * 6;
+      ctx.strokeStyle = '#e56852'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+      // Eyebrows
+      [-20, 20].forEach(ex => {
+        ctx.beginPath();
+        ctx.moveTo(cx + ex - 12, cy - 22 - browLift);
+        ctx.quadraticCurveTo(cx + ex, cy - 28 - browLift, cx + ex + 12, cy - 22 - browLift);
+        ctx.stroke();
+        // Eyes
+        ctx.beginPath(); ctx.ellipse(cx + ex, cy - 11, 9, 4.5, 0, 0, Math.PI * 2); ctx.stroke();
+      });
+      // Lips
+      ctx.beginPath(); ctx.ellipse(cx, cy + 28, 16, 6 + (faceMeta?.mouthOpen || 0) * 6, 0, 0, Math.PI * 2); ctx.stroke();
+      // Teal eye-nose bridge line (like MediaPipe pose face connector)
+      ctx.strokeStyle = '#3be0c2'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(cx - 32, cy - 6); ctx.lineTo(cx - 18, cy - 12); ctx.lineTo(cx, cy + 4); ctx.lineTo(cx + 18, cy - 12); ctx.lineTo(cx + 32, cy - 6); ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawHandSkeleton(ctx, pts, W, H, color, label) {
+      if (!pts || pts.length < 21) return;
+      ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      for (const [a, b] of HAND_CONNECTIONS) {
+        ctx.beginPath(); ctx.moveTo(pts[a].x * W, pts[a].y * H); ctx.lineTo(pts[b].x * W, pts[b].y * H); ctx.stroke();
+      }
+      for (let i = 0; i < pts.length; i++) {
+        ctx.beginPath(); ctx.fillStyle = (i === 0 || i % 4 === 0) ? '#fff' : color; ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+        ctx.arc(pts[i].x * W, pts[i].y * H, i === 0 ? 4.8 : 3.0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+      if (label) {
+        ctx.font = '600 11.5px sans-serif'; const tw = ctx.measureText(label).width;
+        const bx = Math.max(10, Math.min(W - tw - 24, pts[0].x * W - tw / 2));
+        const by = Math.max(24, pts[0].y * H - 30);
+        ctx.fillStyle = color; roundRect(ctx, bx - 8, by - 14, tw + 16, 22, 999); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(label, bx, by + 1);
+      }
+      ctx.restore();
+    }
+
+    function renderLandmarkFrame(canvas, frame, note) {
+      const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H); ctx.fillStyle = '#0f1417'; ctx.fillRect(0, 0, W, H);
+      drawViewfinderCorners(ctx, W, H);
+      if (!frame) return;
+      const handCount = (frame.dominant ? 1 : 0) + (frame.nonDominant ? 1 : 0);
+      drawHolisticStatusPill(ctx, handCount, 1, 1);
+      if (frame.pose?.landmarks?.length >= 25) {
+        drawPoseSkeleton(ctx, frame.pose.landmarks, W, H);
+        drawCompactHolisticBackdrop(ctx, W, H, frame.pose, frame.face);
+      } else {
+        drawCompactHolisticBackdrop(ctx, W, H, frame.pose, frame.face);
+      }
+      if (frame.nonDominant) drawHandSkeleton(ctx, frame.nonDominant.landmarks, W, H, '#32a890', `非主手 ${frame.nonDominant.handshape} (${frame.nonDominant.palm === 'down' ? '朝下' : '朝上'})`);
+      if (frame.dominant) drawHandSkeleton(ctx, frame.dominant.landmarks, W, H, '#f5b841', `主手 ${frame.dominant.handshape} (${frame.dominant.palm === 'up' ? '朝上' : '朝下'})`);
+      if (note) { ctx.fillStyle = '#9aa6b2'; ctx.font = '12px sans-serif'; ctx.fillText(note, 26, H - 12); }
+    }
+
+    // RECORDER LOOP WITH REAL MEDIAPIPE HOLISTIC (FACE 478 + POSE 33 + HANDS 42)
+    let simTick = 0;
+    function setRecordSource(src) {
+      state.recSource = src;
+      document.getElementById('srcCamBtn').classList.toggle('btn-primary', src === 'camera');
+      document.getElementById('srcSimBtn').classList.toggle('btn-primary', src === 'sim');
+      document.getElementById('simPickerBar').classList.toggle('hidden', src === 'camera');
+      if (src === 'camera') startRealCamera(); else { stopRealCamera(); document.getElementById('recStatusText').textContent = '待命（Holistic 示範串流）'; }
+    }
+
+    async function startRealCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false });
+        state.recStream = stream;
+        const vid = document.getElementById('recVideo');
+        vid.srcObject = stream; await vid.play();
+        document.getElementById('recStatusText').textContent = window.realMediaPipe?.ready ? 'Holistic 553點 即時偵測中' : '鏡頭已啟動';
+      } catch (e) {
+        document.getElementById('recMessage').textContent = `無法啟動攝影機（${e.message}），切回示範模擬串流。`;
+        setRecordSource('sim');
+      }
+    }
+    function stopRealCamera() { if (state.recStream) { state.recStream.getTracks().forEach(t => t.stop()); state.recStream = null; } }
+
+    function runRecLoop() {
+      simTick++;
+      if (state.activeTab === 'record') {
+        const canvas = document.getElementById('recCanvas'), ctx = canvas.getContext('2d'), vid = document.getElementById('recVideo');
+        if (state.recSource === 'camera' && state.recStream && vid.readyState >= 2) {
+          const blackOnly = Boolean(document.getElementById('chkHolisticOnly')?.checked);
+          if (blackOnly) {
+            ctx.fillStyle = '#0f1417'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+          } else {
+            ctx.save(); ctx.scale(-1, 1); ctx.drawImage(vid, -canvas.width, 0, canvas.width, canvas.height); ctx.restore();
+            ctx.fillStyle = 'rgba(15,20,23,0.28)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          drawViewfinderCorners(ctx, canvas.width, canvas.height);
+
+          if (window.realMediaPipe?.ready && window.realMediaPipe.detector) {
+            const nowTs = performance.now();
+            const handRes = window.realMediaPipe.detector.detectForVideo(vid, nowTs);
+            const faceRes = window.realMediaPipe.faceDetector ? window.realMediaPipe.faceDetector.detectForVideo(vid, nowTs) : null;
+            const poseRes = window.realMediaPipe.poseDetector ? window.realMediaPipe.poseDetector.detectForVideo(vid, nowTs) : null;
+
+            let dh = null, ndh = null, poseSummary = null, faceSummary = null;
+            let faceCount = 0, poseCount = 0;
+
+            // Pose (33pt)
+            if (poseRes?.landmarks?.[0]) {
+              poseCount = 1;
+              const pPts = poseRes.landmarks[0].map(p => ({ x: 1 - p.x, y: p.y, z: p.z }));
+              drawPoseSkeleton(ctx, pPts, canvas.width, canvas.height);
+              const lSh = pPts[11], rSh = pPts[12], nose = pPts[0];
+              poseSummary = {
+                nose: { x: nose.x, y: nose.y },
+                shMid: { x: (lSh.x + rSh.x) / 2, y: (lSh.y + rSh.y) / 2 },
+                shWidth: Math.hypot(lSh.x - rSh.x, lSh.y - rSh.y),
+                landmarks: pPts.slice(0, 25).map(p => ({ x: Number(p.x.toFixed(4)), y: Number(p.y.toFixed(4)) }))
+              };
+            }
+
+            // Face (478pt + Blendshapes)
+            if (faceRes?.faceLandmarks?.[0]) {
+              faceCount = 1;
+              const fPts = faceRes.faceLandmarks[0].map(p => ({ x: 1 - p.x, y: p.y, z: p.z }));
+              drawRealFaceMesh(ctx, fPts, canvas.width, canvas.height);
+              const cats = faceRes.faceBlendshapes?.[0]?.categories || [];
+              const getBS = name => cats.find(c => c.categoryName === name)?.score || 0;
+              faceSummary = {
+                browUp: Number(getBS('browInnerUp').toFixed(3)),
+                browDown: Number(((getBS('browDownLeft') + getBS('browDownRight')) / 2).toFixed(3)),
+                mouthOpen: Number(getBS('jawOpen').toFixed(3))
+              };
+            }
+
+            // Hands (42pt)
+            const dhTarget = state.handedness === 'right' ? 'Right' : 'Left';
+            (handRes.landmarks || []).forEach((lm, idx) => {
+              const rawLabel = handRes.handedness?.[idx]?.[0]?.categoryName || 'Right';
+              const mirroredPts = lm.map(p => ({ x: 1 - p.x, y: p.y, z: p.z }));
+              const palm = detectPalmOrientation(lm, rawLabel);
+              const shape = classifyRealHandshape(lm);
+              const obj = { side: rawLabel, handshape: shape, palm, wrist: { x: mirroredPts[0].x, y: mirroredPts[0].y }, landmarks: mirroredPts };
+              if (rawLabel === dhTarget) dh = obj; else ndh = obj;
+            });
+            const handCount = (dh ? 1 : 0) + (ndh ? 1 : 0);
+            if (ndh) drawHandSkeleton(ctx, ndh.landmarks, canvas.width, canvas.height, '#32a890', `非主手 ${ndh.handshape} (${ndh.palm === 'down' ? '朝下' : '朝上'})`);
+            if (dh) drawHandSkeleton(ctx, dh.landmarks, canvas.width, canvas.height, '#f5b841', `主手 ${dh.handshape} (${dh.palm === 'up' ? '朝上' : '朝下'})`);
+            drawHolisticStatusPill(ctx, handCount, faceCount, poseCount);
+
+            state.lastLiveFrame = {
+              frameIndex: simTick, timestampMs: Math.round(nowTs), phase: 'live',
+              handedness: state.handedness, dominant: dh, nonDominant: ndh, pose: poseSummary, face: faceSummary
+            };
+            document.getElementById('liveDhReadout').textContent = dh ? `主手：${dh.handshape}（掌心${dh.palm === 'up' ? '朝上' : dh.palm === 'down' ? '朝下' : '朝側'}）` : '主手：未入鏡';
+            document.getElementById('liveNdhReadout').textContent = ndh ? `非主手：${ndh.handshape}（掌心${ndh.palm === 'down' ? '朝下' : ndh.palm === 'up' ? '朝上' : '朝側'}）` : '非主手：未入鏡';
+            document.getElementById('liveHolisticReadout').textContent = `臉部 ${faceCount} · 姿勢 ${poseCount}${faceSummary && faceSummary.browUp > 0.35 ? ' · 挑眉' : ''}`;
+          }
+        } else {
+          const objId = document.getElementById('simActionSelect').value || state.objects[0].id;
+          const seq = synthesizeSequence({ objectId: objId }, 15, 2.5);
+          const f = seq[Math.floor((simTick / 3) % seq.length)];
+          renderLandmarkFrame(canvas, f, 'Holistic 553點 示範串流（切換「真實鏡頭」即啟動 MediaPipe 臉部＋姿勢＋雙手追蹤）');
+          document.getElementById('liveDhReadout').textContent = `主手：${f.dominant.handshape}（掌心${f.dominant.palm === 'up' ? '朝上' : '朝下'}）`;
+          document.getElementById('liveNdhReadout').textContent = f.nonDominant ? `非主手：${f.nonDominant.handshape}（掌心${f.nonDominant.palm === 'down' ? '朝下' : '朝上'}）` : '非主手：無';
+          document.getElementById('liveHolisticReadout').textContent = '臉部 1 · 姿勢 1（示範）';
+        }
+      }
+      requestAnimationFrame(runRecLoop);
+    }
+
+    function toggleRecording() { state.isRecording ? stopRecording() : startRecording(); }
+    function startRecording() {
+      state.isRecording = true; state.lastLandmarks = []; state.recVideoChunks = []; state.lastVideoBlob = null;
+      state.recStartTime = performance.now();
+      document.getElementById('btnStartRec').textContent = '■ 停止錄影';
+      document.getElementById('recDot').style.background = '#d15b42';
+      document.getElementById('recStatusText').textContent = '錄影與骨架擷取中...';
+      const canvas = document.getElementById('recCanvas'), fps = Number(document.getElementById('recFpsSelect').value) || 15;
+      try {
+        const stream = canvas.captureStream(fps);
+        state.mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
+        state.mediaRecorder.ondataavailable = e => { if (e.data?.size) state.recVideoChunks.push(e.data); };
+        state.mediaRecorder.onstop = () => { state.lastVideoBlob = new Blob(state.recVideoChunks, { type: 'video/webm' }); document.getElementById('btnDownloadVideo').disabled = false; };
+        state.mediaRecorder.start(100);
+      } catch (e) {}
+
+      const objId = document.getElementById('recObjectSelect').value || state.objects[0].id;
+      const tplSeq = synthesizeSequence({ objectId: objId }, fps, 2.5);
+      let idx = 0;
+      state.recFrameTimer = setInterval(() => {
+        const elapsed = performance.now() - state.recStartTime;
+        if (state.recSource === 'camera') {
+          if (state.lastLiveFrame && (state.lastLiveFrame.dominant || state.lastLiveFrame.nonDominant)) {
+            state.lastLandmarks.push({ ...JSON.parse(JSON.stringify(state.lastLiveFrame)), frameIndex: idx, timestampMs: Math.round(elapsed) });
+            idx++;
+          }
+        } else {
+          const tpl = JSON.parse(JSON.stringify(tplSeq[Math.min(idx, tplSeq.length - 1)]));
+          tpl.frameIndex = idx; tpl.timestampMs = Math.round(elapsed);
+          state.lastLandmarks.push(tpl);
+          idx++;
+        }
+        document.getElementById('recTimerBadge').textContent = `00:${String(Math.floor(elapsed/1000)).padStart(2,'0')} · ${idx} frames`;
+        if (state.recSource === 'sim' && idx >= tplSeq.length) stopRecording();
+      }, Math.round(1000 / fps));
+    }
+
+    function stopRecording() {
+      state.isRecording = false; clearInterval(state.recFrameTimer);
+      if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
+      document.getElementById('btnStartRec').textContent = '● 開始錄影與擷取';
+      document.getElementById('recDot').style.background = '#2a8572';
+      document.getElementById('recStatusText').textContent = `擷取完成 (${state.lastLandmarks.length} frames)`;
+      const hasData = state.lastLandmarks.length > 0;
+      ['btnSaveSample','btnExpJson','btnExpJsonl','btnExpCsv'].forEach(id => document.getElementById(id).disabled = !hasData);
+    }
+
+    state.overwriteSampleId = null;
+    state.editingSampleId = null;
+    state.lastDeletedSample = null;
+
+    function onClipTypeChange() {
+      const ct = document.getElementById('recClipType')?.value || 'sentence';
+      const obj = state.objects.find(o => o.id === document.getElementById('recObjectSelect')?.value) || state.objects[0];
+      if (ct === 'word_loc') {
+        document.getElementById('recLabelInput').value = '桌子';
+        document.getElementById('recDhShape').value = 'Open B';
+        document.getElementById('recNdhMode').value = 'Open B_down';
+      } else if (ct === 'word_noun') {
+        document.getElementById('recLabelInput').value = obj.name;
+        document.getElementById('recDhShape').value = obj.handshape;
+        document.getElementById('recNdhMode').value = 'none';
+      } else {
+        document.getElementById('recLabelInput').value = `${obj.name}放在桌子上`;
+        document.getElementById('recDhShape').value = obj.handshape;
+        document.getElementById('recNdhMode').value = obj.ndhMode;
+      }
+    }
+
+    function startOverwriteSample(id) {
+      const s = state.samples.find(x => x.id === id); if (!s) return;
+      state.overwriteSampleId = id; state.editingSampleId = null;
+      if (document.getElementById('recClipType')) document.getElementById('recClipType').value = s.clipType || 'sentence';
+      document.getElementById('recLabelInput').value = s.label || '';
+      if (state.objects.some(o => o.id === s.objectId)) {
+        document.getElementById('recObjectSelect').value = s.objectId;
+        document.getElementById('simActionSelect').value = s.objectId;
+      }
+      document.getElementById('recSignerId').value = s.signerId || 'D01';
+      document.getElementById('recDhShape').value = s.dhShape || 'Open O';
+      document.getElementById('recNdhMode').value = s.ndhMode || 'Open B_down';
+      document.getElementById('overwriteBanner').classList.remove('hidden');
+      document.getElementById('overwriteTargetText').textContent = `「${s.label}」（語者 ${s.signerId || 'D01'}）`;
+      document.getElementById('btnSaveSample').textContent = '🔄 覆蓋原紀錄';
+      document.getElementById('recMessage').textContent = '已進入重錄覆蓋模式：請重新錄影後按「🔄 覆蓋原紀錄」即可直接取代舊檔！';
+      renderSampleList();
+    }
+
+    function cancelOverwriteMode() {
+      state.overwriteSampleId = null;
+      document.getElementById('overwriteBanner').classList.add('hidden');
+      document.getElementById('btnSaveSample').textContent = '存入資料庫';
+      document.getElementById('recMessage').textContent = '已取消重錄覆蓋模式。';
+      renderSampleList();
+    }
+
+    async function saveCurrentRecording() {
+      if (!state.lastLandmarks.length) return;
+      const clipType = document.getElementById('recClipType')?.value || 'sentence';
+      const label = document.getElementById('recLabelInput').value.trim() || '未命名手語';
+      const obj = state.objects.find(o => o.id === document.getElementById('recObjectSelect').value) || state.objects[0];
+      const signerId = (document.getElementById('recSignerId')?.value || 'D01').trim() || 'D01';
+      const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
+
+      if (state.overwriteSampleId) {
+        const idx = state.samples.findIndex(x => x.id === state.overwriteSampleId);
+        if (idx !== -1) {
+          const updated = {
+            ...state.samples[idx], clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+            dhShape: document.getElementById('recDhShape').value, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+            handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
+            frameCount: state.lastLandmarks.length, createdAt: `已重錄覆蓋 ${nowStr}`, frames: state.lastLandmarks
+          };
+          state.samples[idx] = updated; await idbPut('samples', updated);
+          state.overwriteSampleId = null;
+          document.getElementById('overwriteBanner').classList.add('hidden');
+          document.getElementById('btnSaveSample').textContent = '存入資料庫';
+          renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
+          document.getElementById('recMessage').textContent = `✅ 已重錄覆蓋「${label}」（語者 ${signerId}）！`;
+          if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(updated, state.lastVideoBlob);
+          return;
+        }
+      }
+
+      const smp = {
+        id: 'smp_' + Date.now(), clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+        dhShape: document.getElementById('recDhShape').value, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+        handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
+        frameCount: state.lastLandmarks.length, createdAt: nowStr, frames: state.lastLandmarks
+      };
+      state.samples.unshift(smp); await idbPut('samples', smp);
+      renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
+      const typeLabel = clipType === 'word_noun' ? '單詞（名詞）' : (clipType === 'word_loc' ? '單詞（處所）' : '完整句子');
+      document.getElementById('recMessage').textContent = `✅ 已存入本機資料庫：「${label}」（${typeLabel} · 語者 ${signerId}）`;
+      if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(smp, state.lastVideoBlob);
+    }
+
+    function triggerDownload(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
+    function downloadLastVideo() { if (state.lastVideoBlob) triggerDownload(state.lastVideoBlob, `${document.getElementById('recLabelInput').value || 'tsl'}.webm`); }
+    function exportCurrentLandmark(fmt) { if (state.lastLandmarks.length) exportFramesAs(state.lastLandmarks, document.getElementById('recLabelInput').value || 'tsl', fmt); }
+    function exportFramesAs(frames, base, fmt) {
+      if (fmt === 'json') triggerDownload(new Blob([JSON.stringify({ schema: 'tsl-put-v1', clipName: base, frames }, null, 2)], { type: 'application/json' }), `${base}.json`);
+      else if (fmt === 'jsonl') triggerDownload(new Blob([frames.map(f => JSON.stringify(f)).join('\n')], { type: 'application/x-ndjson' }), `${base}.jsonl`);
+      else {
+        const rows = ['frame_index,timestamp_ms,dh_shape,dh_palm,dh_x,dh_y,ndh_shape,ndh_palm,ndh_x,ndh_y', ...frames.map(f => [f.frameIndex, f.timestampMs, f.dominant?.handshape||'', f.dominant?.palm||'', f.dominant?.wrist?.x?.toFixed(4)||'', f.dominant?.wrist?.y?.toFixed(4)||'', f.nonDominant?.handshape||'', f.nonDominant?.palm||'', f.nonDominant?.wrist?.x?.toFixed(4)||'', f.nonDominant?.wrist?.y?.toFixed(4)||''].join(','))];
+        triggerDownload(new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+      }
+    }
+    function exportFullDatabase() { triggerDownload(new Blob([JSON.stringify({ rules: state.rules, objects: state.objects, samples: state.samples }, null, 2)], { type: 'application/json' }), 'tsl_put_db_backup.json'); }
+    async function handleImportFile(e) {
+      const f = e.target.files?.[0]; if (!f) return;
+      try {
+        const parsed = JSON.parse(await f.text());
+        if (parsed.rules && parsed.objects && parsed.samples) {
+          state.rules = parsed.rules; state.objects = parsed.objects; state.samples = parsed.samples;
+          await persistConfig(); for (const s of state.samples) await idbPut('samples', s); renderAll();
+        } else if (Array.isArray(parsed.frames)) {
+          const smp = { id: 'imp_' + Date.now(), label: parsed.clipName || f.name, signerId: 'IMP', objectId: state.objects[0].id, ruleId: state.objects[0].ruleId, dhShape: 'Open O', dhPalm: 'up', ndhMode: 'Open B_down', frameCount: parsed.frames.length, createdAt: '匯入資料', frames: parsed.frames };
+          state.samples.unshift(smp); await idbPut('samples', smp); renderAll();
+        }
+      } catch (err) { document.getElementById('recMessage').textContent = '匯入失敗：' + err.message; }
+      e.target.value = '';
+    }
+
+    async function seedDemoSamples() {
+      state.samples = state.objects.map(o => ({
+        id: 'demo_' + o.id, label: `${o.name}放在桌子上`, signerId: 'D01', objectId: o.id, ruleId: o.ruleId,
+        dhShape: o.handshape, dhPalm: o.palm, ndhMode: o.ndhMode, frameCount: 38, createdAt: '內建標準範例',
+        frames: synthesizeSequence({ objectId: o.id }, 15, 2.5)
+      }));
+      for (const s of state.samples) await idbPut('samples', s);
+    }
+    async function resetDemoDatabase() { state.rules = JSON.parse(JSON.stringify(DEFAULT_RULES)); state.objects = JSON.parse(JSON.stringify(DEFAULT_OBJECTS)); await persistConfig(); await seedDemoSamples(); renderAll(); }
+
+    function toggleEditSample(id) { state.editingSampleId = (state.editingSampleId === id) ? null : id; renderSampleList(); }
+    async function saveEditedSample(id) {
+      const idx = state.samples.findIndex(x => x.id === id); if (idx === -1) return;
+      const newLabel = document.getElementById(`editLabel_${id}`)?.value.trim() || state.samples[idx].label;
+      const newSigner = document.getElementById(`editSigner_${id}`)?.value.trim() || 'D01';
+      const newShape = document.getElementById(`editShape_${id}`)?.value || state.samples[idx].dhShape;
+      const newObjId = document.getElementById(`editObj_${id}`)?.value || state.samples[idx].objectId;
+      const obj = state.objects.find(o => o.id === newObjId);
+      const updated = { ...state.samples[idx], label: newLabel, signerId: newSigner, dhShape: newShape, objectId: newObjId, ruleId: obj ? obj.ruleId : state.samples[idx].ruleId };
+      state.samples[idx] = updated; await idbPut('samples', updated);
+      state.editingSampleId = null; renderSampleList(); refreshRecognizerSelects();
+      document.getElementById('recMessage').textContent = `✅ 已更新「${newLabel}」（語者 ${newSigner}）`;
+    }
+
+    async function deleteSample(id) {
+      const target = state.samples.find(s => s.id === id); if (!target) return;
+      state.lastDeletedSample = target;
+      if (state.overwriteSampleId === id) cancelOverwriteMode();
+      if (state.editingSampleId === id) state.editingSampleId = null;
+      state.samples = state.samples.filter(s => s.id !== id); await idbDelete('samples', id);
+      renderSampleList(); refreshRecognizerSelects();
+      const bar = document.getElementById('undoDeleteBar');
+      if (bar) { bar.classList.remove('hidden'); document.getElementById('undoDeleteText').textContent = `已刪除「${target.label}」（語者 ${target.signerId || 'D01'}）`; }
+    }
+
+    async function undoDeleteSample() {
+      if (!state.lastDeletedSample) return;
+      const restored = state.lastDeletedSample; state.lastDeletedSample = null;
+      state.samples.unshift(restored); await idbPut('samples', restored);
+      document.getElementById('undoDeleteBar')?.classList.add('hidden');
+      renderSampleList(); refreshRecognizerSelects();
+      document.getElementById('recMessage').textContent = `↩ 已復原「${restored.label}」！`;
+    }
+
+    function sendSampleToRecognizer(id) { switchTab('recognize'); document.getElementById('recogDbSelect').value = id; runDbSampleRecognition(); }
+
+    function renderSampleList() {
+      document.getElementById('sampleCountPill').textContent = `${state.samples.length} 筆`;
+      document.getElementById('statSamples').textContent = state.samples.length;
+      document.getElementById('statRules').textContent = state.rules.length;
+      document.getElementById('statObjects').textContent = state.objects.length;
+      const q = (document.getElementById('sampleSearchInput')?.value || '').trim().toLowerCase();
+      const list = q ? state.samples.filter(s => (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q)) : state.samples;
+      const shapeOpts = ['Open O','Bent 5','Bent C','Open B','C','1','Flat O'];
+      document.getElementById('sampleListContainer').innerHTML = list.map(s => {
+        const r = state.rules.find(x => x.id === s.ruleId);
+        const sid = s.signerId || 'D01';
+        const isEd = state.editingSampleId === s.id, isOv = state.overwriteSampleId === s.id;
+        const typeBadge = s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (r ? r.code : '句子'));
+        return `<div class="subcard space-y-sm" style="${isOv ? 'border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);' : ''}">
+          <div class="between">
+            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b> · 主手 ${s.dhShape} · ${s.frameCount}f</div></div>
+            <span class="pill">${typeBadge}</span>
+          </div>
+          ${isEd ? `<div class="card space-y-sm" style="padding:10px;">
+            <div class="grid-2">
+              <div><label class="field-label">修改文字名稱</label><input id="editLabel_${s.id}" type="text" value="${s.label}" /></div>
+              <div><label class="field-label">語者編號</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
+            </div>
+            <div class="grid-2">
+              <div><label class="field-label">關聯物件</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}</option>`).join('')}</select></div>
+              <div><label class="field-label">主手手形</label><select id="editShape_${s.id}">${shapeOpts.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${sh}</option>`).join('')}</select></div>
+            </div>
+            <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存修改</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
+          </div>` : ''}
+          <div class="row">
+            <button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">✏️ 編輯</button>
+            <button class="btn btn-sm" onclick="startOverwriteSample('${s.id}')">🔄 重錄覆蓋</button>
+            <button class="btn btn-sm" onclick="sendSampleToRecognizer('${s.id}')">AI 辨識</button>
+            ${s.videoUrl ? `<a class="btn btn-sm" href="${s.videoUrl}" target="_blank" style="text-decoration:none;color:var(--sage);">🎬 硬碟影片</a>` : ''}
+            <button class="btn btn-sm" style="margin-left:auto;" onclick="deleteSample('${s.id}')">🗑️ 刪除</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // RULES TAB
+    function toggleNewRuleForm() { document.getElementById('newRuleForm').classList.toggle('hidden'); }
+    function toggleNewObjectForm() { document.getElementById('newObjectForm').classList.toggle('hidden'); }
+    async function addNewRule() {
+      const name = document.getElementById('newRuleName').value.trim(); if (!name) return;
+      state.rules.push({ id: 'rule_' + Date.now(), code: `規則${state.rules.length+1}`, name, condition: document.getElementById('newRuleCondition').value.trim() || '自訂條件', coMode: document.getElementById('newRuleCoMode').value, desc: document.getElementById('newRuleDesc').value.trim() || '使用者新增規則' });
+      await persistConfig(); toggleNewRuleForm(); renderAll();
+    }
+    async function addNewObject() {
+      const name = document.getElementById('objName').value.trim(); if (!name) return;
+      const ruleId = document.getElementById('objRuleId').value, rule = state.rules.find(r => r.id === ruleId);
+      const o = { id: 'obj_' + Date.now(), name, shapeDesc: document.getElementById('objShapeDesc').value.trim() || '自訂外形', lexicalGloss: document.getElementById('objLexicalGloss').value.trim() || name, ruleId, handshape: document.getElementById('objHandshape').value, palm: document.getElementById('objPalm').value, ndhMode: rule?.coMode === 'lexical_put' ? 'Open B_up' : 'Open B_down', note: `依 ${rule?.code||'規則'} 選用` };
+      state.objects.push(o); await persistConfig();
+      const smp = { id: 'smp_' + o.id, label: `${o.name}放在桌子上`, objectId: o.id, ruleId: o.ruleId, dhShape: o.handshape, dhPalm: o.palm, ndhMode: o.ndhMode, frameCount: 38, createdAt: '自動建立', frames: synthesizeSequence({ objectId: o.id }, 15, 2.5) };
+      state.samples.unshift(smp); await idbPut('samples', smp); toggleNewObjectForm(); renderAll();
+    }
+    async function deleteObject(id) { if (state.objects.length <= 1) return; state.objects = state.objects.filter(o => o.id !== id); await persistConfig(); renderAll(); }
+
+    function renderRulesTab() {
+      document.getElementById('rulesGrid').innerHTML = state.rules.map(r => `<div class="subcard space-y-sm"><span class="pill" style="color:var(--primary);">${r.code}</span><div style="font-weight:700;">${r.name}</div><div class="muted"><b>條件：</b>${r.condition}</div><div class="muted">${r.desc}</div></div>`).join('');
+      document.getElementById('objRuleId').innerHTML = state.rules.map(r => `<option value="${r.id}">${r.code}：${r.name}</option>`).join('');
+      document.getElementById('objectTableBody').innerHTML = state.objects.map(o => {
+        const r = state.rules.find(x => x.id === o.ruleId);
+        return `<tr><td><b>${o.name}</b></td><td>${o.shapeDesc}<div class="muted">${o.lexicalGloss}</div></td><td><span class="pill">${r?r.code:''}</span></td><td><b>${o.handshape}</b> · 掌心${o.palm==='up'?'朝上':'朝下'}</td><td style="text-align:right;"><button class="btn btn-sm" onclick="previewObjectInAvatar('${o.name}')">卡通示範</button> <button class="btn btn-sm" onclick="deleteObject('${o.id}')">刪除</button></td></tr>`;
+      }).join('');
+    }
+
+    // RECOGNIZER TAB
+    function refreshRecognizerSelects() {
+      document.getElementById('recogScenarioChips').innerHTML = state.objects.map(o => `<button class="btn btn-sm" onclick="runScenarioRecognition('${o.id}',false)">${o.name}放在桌子上</button>`).join('') +
+        `<button class="btn btn-sm" onclick="runScenarioRecognition('obj_apple',true,'static_noun')">[對照組] 只比蘋果</button><button class="btn btn-sm" onclick="runScenarioRecognition('obj_watermelon',true,'sideways_wave')">[對照組] 水平揮動</button>`;
+      document.getElementById('recogDbSelect').innerHTML = state.samples.map(s => `<option value="${s.id}">${s.label} (${s.frameCount}f)</option>`).join('');
+    }
+    function runScenarioRecognition(id, neg=false, negType=null) {
+      const obj = state.objects.find(o => o.id === id) || state.objects[0];
+      startRecognitionPlayback(synthesizeSequence({ objectId: id, isNegative: neg, negativeType: negType }, 15, 2.5), { objectId: id, title: neg ? '非放置對照組' : `${obj.name}放在桌子上` });
+    }
+    function runDbSampleRecognition() { const s = state.samples.find(x => x.id === document.getElementById('recogDbSelect').value); if (s) startRecognitionPlayback(s.frames, { objectId: s.objectId, title: s.label }); }
+    function replayCurrentRecognition() { if (state.recogFrames.length) startRecognitionPlayback(state.recogFrames, state.recogMeta); }
+    function startRecognitionPlayback(frames, meta) {
+      if (state.recogAnimId) cancelAnimationFrame(state.recogAnimId);
+      state.recogFrames = frames; state.recogMeta = meta; state.recogFrameIdx = 0;
+      const res = analyzeLandmarkSequence(frames, meta.objectId), canvas = document.getElementById('recogCanvas');
+      document.getElementById('recogVerdictOverlay').classList.add('hidden');
+      let last = 0;
+      function step(ts) {
+        if (!last) last = ts;
+        if (ts - last >= 55) {
+          last = ts; const idx = Math.min(state.recogFrameIdx, frames.length - 1), p = idx / Math.max(1, frames.length - 1);
+          renderLandmarkFrame(canvas, frames[idx], `${meta.title} · ${idx+1}/${frames.length}`);
+          document.getElementById('recogPhaseBanner').textContent = `${meta.title}（${Math.round(p*100)}%）`;
+          [['m1', res.ndhHoldScore, res.ndhSummary], ['m2', res.shapeScore, res.dhSummary], ['m3', res.trajScore, res.trajSummary], ['m4', res.ruleScore, res.ruleSummary]].forEach(([k, v, sub]) => {
+            const val = Math.round(v * Math.min(1, p * 1.4));
+            document.getElementById(k+'Val').textContent = `${val}%`;
+            document.getElementById(k+'Bar').style.width = `${val}%`;
+            document.getElementById(k+'Sub').textContent = sub;
+          });
+          state.recogFrameIdx++;
+          if (state.recogFrameIdx >= frames.length) {
+            document.getElementById('recogBadge').textContent = res.isPut ? '✅ 確認為「放」' : '⚠️ 非「放」動作';
+            document.getElementById('recogVerdictOverlay').classList.remove('hidden');
+            document.getElementById('recogFinalSentence').textContent = res.sentence;
+            document.getElementById('recogIsPutPill').textContent = res.isPut ? (res.matchedRule?.code || '確認為放') : '非放置動作';
+            document.getElementById('reasoningTrace').innerHTML = res.trace.map(l => `<div>${l}</div>`).join('');
+            return;
+          }
+        }
+        state.recogAnimId = requestAnimationFrame(step);
+      }
+      state.recogAnimId = requestAnimationFrame(step);
+    }
+
+    // AVATAR TAB
+    function parseSentenceToPlan(text) {
+      const t = text.trim() || '蘋果放在桌子上';
+      let obj = [...state.objects].sort((a,b) => b.name.length - a.name.length).find(o => t.includes(o.name)) || { name: '物品', shapeDesc: '未登錄', lexicalGloss: '物件＋一般放', ruleId: state.rules[0].id, handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '預設使用一般詞彙放' };
+      const rule = state.rules.find(r => r.id === obj.ruleId) || state.rules[0], isLex = rule.coMode === 'lexical_put';
+      return {
+        sentence: t, object: obj, rule, isLexical: isLex, dhShape: obj.handshape, dhPalm: obj.palm, ndhShape: 'Open B', ndhPalm: isLex ? 'up' : 'down',
+        steps: [
+          { idx: 0, range: [0, 0.32], title: `步驟 1：比出物件「${obj.name}」`, gloss: `${obj.lexicalGloss} → 準備 ${obj.handshape}`, detail: `先比出物件「${obj.name}」（${obj.shapeDesc}）。` },
+          { idx: 1, range: [0.32, 0.62], title: '步驟 2：比「桌子」並定格非主手參照面', gloss: isLex ? '桌子 [準備一般詞彙放]' : '桌子 [NDH: Open B 掌心朝下]', detail: isLex ? '比出「桌子」，準備接續一般獨立詞彙「放 (8-084)」。' : '非主手比出桌子代形詞 Open B（掌心朝下）定格為支撐平面。' },
+          { idx: 2, range: [0.62, 1], title: isLex ? '步驟 3：一般詞彙「放 (8-084)」' : `步驟 3：共構「放」(${obj.handshape} ↓ Open B)`, gloss: isLex ? '雙手 Open B 掌心朝上疊放' : `DH ${obj.handshape} 朝上 ↓ NDH Open B 朝下`, detail: obj.note }
+        ]
+      };
+    }
+    function previewObjectInAvatar(name) { switchTab('avatar'); document.getElementById('avatarSentenceInput').value = `${name}放在桌子上`; generateAvatarSign(); }
+    function generateAvatarSign() { state.avatarPlan = parseSentenceToPlan(document.getElementById('avatarSentenceInput').value); state.avatarProgress = 0; state.avatarPlaying = true; renderAvatarSidePanel(); }
+    function renderAvatarSidePanel() {
+      const p = state.avatarPlan; if (!p) return;
+      document.getElementById('avatarRuleSummary').innerHTML = `<div class="between"><b>${p.sentence}</b><span class="pill" style="color:var(--primary);">${p.rule.code}</span></div><div class="muted">${p.rule.name} · ${p.object.shapeDesc}</div>`;
+      document.getElementById('avatarStepCards').innerHTML = p.steps.map(s => `<div id="avatarStepCard_${s.idx}" class="subcard step-card" onclick="lockAvatarPhase(${s.idx})"><div style="font-weight:700;font-size:13px;">${s.title}</div><div style="font-family:monospace;font-size:11px;color:var(--primary);">${s.gloss}</div><div class="muted">${s.detail}</div></div>`).join('');
+      const dhS = state.handedness === 'right' ? '右手' : '左手', ndhS = state.handedness === 'right' ? '左手' : '右手';
+      document.getElementById('specNdhTitle').textContent = `非主手（${ndhS}）`;
+      document.getElementById('specNdhShape').textContent = `${p.ndhShape} (手)`;
+      document.getElementById('specNdhDetail').textContent = p.isLexical ? '掌心朝上 (8-084)' : '掌心朝下 · 桌子參照面';
+      document.getElementById('specDhTitle').textContent = `主手（${dhS}）`;
+      document.getElementById('specDhShape').textContent = `${p.dhShape} (${HANDSHAPE_SPECS[p.dhShape]?.zh||''})`;
+      document.getElementById('specDhDetail').textContent = `掌心${p.dhPalm==='up'?'朝上':'朝下'}`;
+    }
+    function lockAvatarPhase(i) { state.avatarPlaying = false; const r = state.avatarPlan.steps[i].range; state.avatarProgress = r[0] + (r[1]-r[0])*0.78; document.getElementById('btnAvatarPlayPause').textContent = '▶ 繼續'; }
+    function toggleAvatarPlay() { state.avatarPlaying = !state.avatarPlaying; document.getElementById('btnAvatarPlayPause').textContent = state.avatarPlaying ? '⏸ 暫停' : '▶ 播放'; }
+    function replayAvatar() { state.avatarProgress = 0; state.avatarPlaying = true; }
+    function scrubAvatar(v) { state.avatarPlaying = false; state.avatarProgress = Number(v)/100; }
+    function setAvatarSpeed(s) { state.avatarSpeed = s; ['05','10','15'].forEach(k => document.getElementById('spd'+k).classList.remove('btn-primary')); document.getElementById(s===0.5?'spd05':s===1?'spd10':'spd15').classList.add('btn-primary'); }
+
+    function drawCartoonHand(ctx, x, y, shapeName, palm, isRight, s, hl) {
+      const spec = HANDSHAPE_SPECS[shapeName] || HANDSHAPE_SPECS['Open O'], dir = isRight ? -1 : 1;
+      const fill = palm === 'up' ? '#f9d8c0' : '#e4b391';
+      ctx.save(); ctx.translate(x, y);
+      if (shapeName === 'Bent C') {
+        ctx.fillStyle = fill; ctx.strokeStyle = hl; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.moveTo(0,8*s); ctx.lineTo(dir*32*s,14*s); ctx.lineTo(dir*32*s,5*s); ctx.lineTo(0,2*s); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,-10*s); ctx.lineTo(dir*38*s,-12*s); ctx.lineTo(dir*38*s,-1*s); ctx.lineTo(0,-1*s); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-dir*8*s,0,15*s,12*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      } else {
+        ctx.fillStyle = fill; ctx.strokeStyle = hl; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.ellipse(0,0,18*s,13*s,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+        const angs = [-0.42,-0.14,0.14,0.42], lens = [34,38,35,28];
+        for (let f = 0; f < 4; f++) {
+          const c = spec.curl[f], sp = angs[f]*(0.45+spec.spread*1.45), L = lens[f]*s*(1-c*0.55);
+          const sx = dir*13*s, sy = (f-1.5)*(5.2+spec.spread*3.8)*s;
+          const ex = sx + Math.cos(sp)*dir*L, ey = sy + Math.sin(sp)*L*0.72 + (palm==='up' ? -c*20*s : c*16*s);
+          ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.strokeStyle = hl; ctx.lineWidth = 8*s; ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+          ctx.beginPath(); ctx.strokeStyle = fill; ctx.lineWidth = 5*s; ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+        }
+        const td = palm === 'up' ? 1 : -1;
+        ctx.beginPath(); ctx.strokeStyle = hl; ctx.lineWidth = 8.4*s; ctx.moveTo(dir*4*s, td*9*s); ctx.lineTo(dir*(18+spec.aperture*10)*s, td*16*s); ctx.stroke();
+        ctx.beginPath(); ctx.strokeStyle = fill; ctx.lineWidth = 5.2*s; ctx.moveTo(dir*4*s, td*9*s); ctx.lineTo(dir*(18+spec.aperture*10)*s, td*16*s); ctx.stroke();
+      }
+      if (shapeName === 'Open O' || shapeName === 'Bent 5' || shapeName === 'C') {
+        ctx.strokeStyle = hl; ctx.lineWidth = 1.6; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.arc(dir*22*s, palm==='up'?-10*s:8*s, shapeName==='Bent 5'?22*s:shapeName==='C'?16*s:12*s, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      ctx.restore();
+    }
+
+    function drawLandmarkDrivenSplitScene(ctx, W, H) {
+      const frames = state.avatarLmFrames || [];
+      if (!frames.length) {
+        ctx.fillStyle = '#0f1417'; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#cbd5e1'; ctx.font = '600 14px sans-serif';
+        ctx.fillText('請從上方選擇一筆資料庫樣本，即可並排顯示「真實 Landmark 骨架」與「骨架驅動虛擬人物」', 42, H / 2);
+        return;
+      }
+      const idx = Math.min(frames.length - 1, Math.floor(state.avatarProgress * frames.length));
+      const f = frames[idx];
+      const half = W / 2;
+      const dhR = state.handedness === 'right';
+
+      // LEFT HALF: Real Holistic Landmark Viewport
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, half, H); ctx.clip();
+      ctx.fillStyle = '#0f1417'; ctx.fillRect(0, 0, half, H);
+      drawViewfinderCorners(ctx, half, H);
+      if (f.pose?.landmarks?.length >= 25) drawPoseSkeleton(ctx, f.pose.landmarks, half, H);
+      else drawCompactHolisticBackdrop(ctx, half, H, f.pose, f.face);
+      if (f.nonDominant?.landmarks) drawHandSkeleton(ctx, f.nonDominant.landmarks, half, H, '#32a890', `非主手 ${f.nonDominant.handshape}`);
+      if (f.dominant?.landmarks) drawHandSkeleton(ctx, f.dominant.landmarks, half, H, '#f5b841', `主手 ${f.dominant.handshape}`);
+      ctx.fillStyle = '#94a3b8'; ctx.font = '700 11px sans-serif';
+      ctx.fillText(`① Landmark 骨架（影格 ${idx + 1}/${frames.length}）`, 18, H - 14);
+      ctx.restore();
+
+      // Divider
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(half, 0); ctx.lineTo(half, H); ctx.stroke();
+
+      // RIGHT HALF: Illustrated Avatar driven directly by real Landmark coordinates!
+      ctx.save();
+      ctx.beginPath(); ctx.rect(half, 0, half, H); ctx.clip();
+      ctx.fillStyle = '#141e26'; ctx.fillRect(half, 0, half, H);
+      const noseX = half + (f.pose?.nose?.x ?? 0.5) * half;
+      const noseY = (f.pose?.nose?.y ?? 0.28) * H;
+      const shMidX = half + (f.pose?.shMid?.x ?? 0.5) * half;
+      const shY = (f.pose?.shMid?.y ?? 0.54) * H;
+      const shHalf = Math.max(46, Math.min(82, ((f.pose?.shWidth ?? 0.30) * half) / 2));
+      const browLift = (f.face?.browUp || 0) * 7;
+      const mouthOpen = (f.face?.mouthOpen || 0) * 8;
+
+      // Torso
+      ctx.fillStyle = '#3d6373';
+      ctx.beginPath();
+      ctx.moveTo(shMidX - shHalf * 1.15, H * 0.98);
+      ctx.quadraticCurveTo(shMidX - shHalf * 1.05, shY, shMidX, shY - 12);
+      ctx.quadraticCurveTo(shMidX + shHalf * 1.05, shY, shMidX + shHalf * 1.15, H * 0.98);
+      ctx.closePath(); ctx.fill();
+      // Neck & Head
+      ctx.fillStyle = '#e4b391'; roundRect(ctx, noseX - 12, noseY + 26, 24, 28, 8); ctx.fill();
+      ctx.fillStyle = '#2b2d38'; ctx.beginPath(); ctx.arc(noseX, noseY - 4, 44, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f9d8c0'; ctx.beginPath(); ctx.ellipse(noseX, noseY + 4, 37, 42, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b2d38'; ctx.beginPath(); ctx.arc(noseX, noseY - 7, 39, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+      // Eyebrows & Eyes (react to real FaceLandmarker browUp!)
+      ctx.strokeStyle = '#3b2e2a'; ctx.lineWidth = 2.2;
+      [-13, 13].forEach(ex => {
+        ctx.beginPath(); ctx.moveTo(noseX + ex - 7, noseY - 9 - browLift); ctx.lineTo(noseX + ex + 7, noseY - 9 - browLift); ctx.stroke();
+        ctx.fillStyle = '#262933'; ctx.beginPath(); ctx.arc(noseX + ex, noseY + 1, 3.6, 0, Math.PI * 2); ctx.fill();
+      });
+      // Mouth (reacts to real jawOpen!)
+      ctx.strokeStyle = '#7a4b3a'; ctx.lineWidth = 2;
+      if (mouthOpen > 2.5) {
+        ctx.fillStyle = '#9b4f45'; ctx.beginPath(); ctx.ellipse(noseX, noseY + 18, 7, Math.min(8, mouthOpen), 0, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(noseX, noseY + 15, 8, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      }
+
+      // Arms & Hands driven by REAL recorded palm centers!
+      const dhP = getPalmCenter(f.dominant);
+      const ndhP = getPalmCenter(f.nonDominant);
+      const dhSign = dhR ? 1 : -1, ndhSign = -dhSign;
+      ctx.strokeStyle = '#4c7b8f'; ctx.lineWidth = 17; ctx.lineCap = 'round';
+      if (ndhP) {
+        const nx = half + ndhP.x * half, ny = ndhP.y * H;
+        ctx.beginPath(); ctx.moveTo(shMidX + ndhSign * shHalf, shY + 14); ctx.quadraticCurveTo(shMidX + ndhSign * (shHalf + 18), H * 0.78, nx, ny); ctx.stroke();
+        drawCartoonHand(ctx, nx, ny, f.nonDominant.handshape || 'Open B', f.nonDominant.palm === 'up' ? 'up' : 'down', !dhR, 0.74, '#32a890');
+      }
+      if (dhP) {
+        const dx = half + dhP.x * half, dy = dhP.y * H;
+        ctx.beginPath(); ctx.moveTo(shMidX + dhSign * shHalf, shY + 14); ctx.quadraticCurveTo(shMidX + dhSign * (shHalf + 18), H * 0.76, dx, dy); ctx.stroke();
+        drawCartoonHand(ctx, dx, dy, f.dominant.handshape || 'Open O', f.dominant.palm === 'down' ? 'down' : 'up', dhR, 0.78, '#f5b841');
+      }
+      ctx.fillStyle = '#94a3b8'; ctx.font = '700 11px sans-serif';
+      ctx.fillText('② 依真實 Landmark 驅動虛擬人物（第 8 章動作生成）', half + 18, H - 14);
+      ctx.restore();
+      document.getElementById('avatarStagePill').textContent = `真實骨架並排驅動：${state.avatarLmTitle || ''} (${idx + 1}/${frames.length})`;
+    }
+
+    function drawAvatarScene() {
+      const c = document.getElementById('avatarCanvas'); if (!c) return;
+      const ctx = c.getContext('2d'), W = c.width, H = c.height;
+      if (state.avatarMode === 'landmark') {
+        drawLandmarkDrivenSplitScene(ctx, W, H);
+        return;
+      }
+      if (!state.avatarPlan) return;
+      const p = state.avatarPlan, t = state.avatarProgress, dhR = state.handedness === 'right';
+      ctx.clearRect(0,0,W,H); ctx.fillStyle = '#f0ede6'; ctx.fillRect(0,0,W,H);
+      const cx = W * 0.43, headY = H * 0.25, dhSign = dhR ? 1 : -1, ndhSign = -dhSign;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx, H*0.56, H*0.42, 0, Math.PI*2); ctx.fill();
+      let step = t >= 0.62 ? 2 : t >= 0.32 ? 1 : 0;
+      for (let i=0;i<3;i++) document.getElementById('avatarStepCard_'+i)?.setAttribute('data-active', String(i===step));
+      document.getElementById('avatarStagePill').textContent = p.steps[step].title;
+
+      const ndhBaseX = cx + ndhSign*44, ndhBaseY = H*0.69;
+      let ndhX = ndhBaseX, ndhY = ndhBaseY, ndhPalm = p.ndhPalm, dhX = cx + dhSign*60, dhY = H*0.48, dhShape = p.dhShape, dhPalm = p.dhPalm, arrow = false;
+      if (t < 0.32) { const k = t/0.32; ndhX = cx + ndhSign*88; ndhY = H*0.80; ndhPalm = 'down'; dhX = cx + dhSign*(58 + Math.sin(k*Math.PI*2)*16); dhY = H*(0.48 - Math.sin(k*Math.PI)*0.05); }
+      else if (t < 0.62) { const k = (t-0.32)/0.30; const ease = 1 - Math.pow(1 - k, 3); ndhX = cx + ndhSign*(88 - 44*ease); ndhY = H*(0.76 - 0.07*ease); ndhPalm = 'down'; dhShape = 'Open B'; dhPalm = 'down'; dhX = cx + dhSign*(88 - 28*ease); dhY = H*(0.74 - 0.05*ease); }
+      else { const k = Math.min(1, (t-0.62)/0.27); const ease = k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2; dhX = cx + dhSign*58*(1-ease) + ndhSign*24*ease; dhY = H*0.46 + (ndhBaseY - 30 - H*0.46)*ease; arrow = true; }
+
+      // Body & Face
+      ctx.fillStyle = '#3d6373'; ctx.beginPath(); ctx.moveTo(cx-100, H*0.98); ctx.quadraticCurveTo(cx-95, H*0.46, cx, H*0.44); ctx.quadraticCurveTo(cx+95, H*0.46, cx+100, H*0.98); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e4b391'; roundRect(ctx, cx-15, headY+46, 30, 32, 10); ctx.fill();
+      ctx.fillStyle = '#2b2d38'; ctx.beginPath(); ctx.arc(cx, headY-4, 58, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#f9d8c0'; ctx.beginPath(); ctx.ellipse(cx, headY+6, 48, 52, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#2b2d38'; ctx.beginPath(); ctx.arc(cx, headY-8, 50, Math.PI*1.05, Math.PI*1.95); ctx.fill();
+      ctx.fillStyle = '#262933'; [-17,17].forEach(ex => { ctx.beginPath(); ctx.arc(cx+ex, headY+6, 4.5, 0, Math.PI*2); ctx.fill(); });
+      ctx.strokeStyle = '#7a4b3a'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.arc(cx, headY+21, 10, 0.15*Math.PI, 0.85*Math.PI); ctx.stroke();
+      // Arms
+      ctx.strokeStyle = '#3d6373'; ctx.lineWidth = 22; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(cx+ndhSign*78, H*0.54); ctx.quadraticCurveTo(cx+ndhSign*88, H*0.76, ndhX, ndhY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+dhSign*78, H*0.54); ctx.quadraticCurveTo(cx+dhSign*88, H*0.74, dhX, dhY); ctx.stroke();
+
+      drawCartoonHand(ctx, ndhX, ndhY, 'Open B', ndhPalm, !dhR, 0.95, '#2a8572');
+      drawCartoonHand(ctx, dhX, dhY, dhShape, dhPalm, dhR, 0.98, '#d15b42');
+      if (arrow) {
+        ctx.strokeStyle = '#d15b42'; ctx.fillStyle = '#d15b42'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(dhX, dhY-56); ctx.lineTo(dhX, dhY-24); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(dhX, dhY-16); ctx.lineTo(dhX-7, dhY-27); ctx.lineTo(dhX+7, dhY-27); ctx.closePath(); ctx.fill();
+      }
+      if (document.getElementById('chkShowSkeleton').checked) {
+        drawHandSkeleton(ctx, generateHand21(ndhX/W, ndhY/H, 'Open B', ndhPalm, !dhR, 0.9), W, H, '#2a8572');
+        drawHandSkeleton(ctx, generateHand21(dhX/W, dhY/H, dhShape, dhPalm, dhR, 0.9), W, H, '#d15b42');
+      }
+      if (document.getElementById('chkShowZoom').checked) {
+        const bx = W - 206, by = 16;
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#e2dcd2'; ctx.lineWidth = 1.5; roundRect(ctx, bx, by, 190, 206, 14); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#1f2328'; ctx.font = '700 12px sans-serif'; ctx.fillText('手形共構放大鏡', bx+14, by+22);
+        ctx.fillStyle = '#d15b42'; ctx.font = '600 11px sans-serif'; ctx.fillText(`主手：${dhShape} · 掌心${dhPalm==='up'?'朝上':'朝下'}`, bx+14, by+44);
+        drawCartoonHand(ctx, bx+108, by+82, dhShape, dhPalm, dhR, 0.9, '#d15b42');
+        ctx.fillStyle = '#2a8572'; ctx.fillText(`非主手：Open B · 掌心${ndhPalm==='down'?'朝下':'朝上'}`, bx+14, by+138);
+        drawCartoonHand(ctx, bx+84, by+172, 'Open B', ndhPalm, !dhR, 0.86, '#2a8572');
+      }
+    }
+
+    function runAvatarLoop(ts) {
+      if (!state.avatarLastTs) state.avatarLastTs = ts;
+      const dt = (ts - state.avatarLastTs) / 1000; state.avatarLastTs = ts;
+      if (state.activeTab === 'avatar') {
+        if (state.avatarPlaying && (state.avatarPlan || state.avatarMode === 'landmark')) {
+          state.avatarProgress = (state.avatarProgress + dt * 0.24 * state.avatarSpeed) % 1;
+          document.getElementById('avatarScrubber').value = Math.round(state.avatarProgress * 100);
+        }
+        drawAvatarScene();
+      }
+      requestAnimationFrame(runAvatarLoop);
+    }
+
+    // =========================================================================
+    // TAB 5: AI SELF-LEARNING (MEDIAPIPE VIDEO + DTW + LOSO + COMMONSENSE / GEMINI)
+    // =========================================================================
+    state.trainedModel = null;
+    state.learningLog = [];
+    state.currentProposal = null;
+    state.tolerance = { dyMin: 0.08, contactRatio: 0.25, normalizeScale: true };
+    state.lastLosoReport = null;
+
+    function updateToleranceConfig() {
+      const dyVal = Number(document.getElementById('tolDySlider')?.value || 8) / 100;
+      const contactPct = Number(document.getElementById('tolContactSlider')?.value || 25);
+      const norm = Boolean(document.getElementById('chkNormScale')?.checked ?? true);
+      state.tolerance = { dyMin: dyVal, contactRatio: contactPct / 100, normalizeScale: norm };
+      const dyLabel = dyVal <= 0.06 ? '寬鬆' : (dyVal >= 0.11 ? '嚴格' : '標準');
+      const ctLabel = contactPct >= 35 ? '高容錯' : (contactPct <= 20 ? '精細' : '中');
+      const e1 = document.getElementById('tolDyVal'), e2 = document.getElementById('tolContactVal');
+      if (e1) e1.textContent = `${dyVal.toFixed(2)}（${dyLabel}）`;
+      if (e2) e2.textContent = `${ctLabel}（±${contactPct}%）`;
+    }
+
+    function extractNormalizedSequence(frames, targetLen = 18) {
+      if (!frames || !frames.length) return [];
+      const useNorm = state.tolerance?.normalizeScale !== false;
+      const seq = [];
+      for (let i = 0; i < targetLen; i++) {
+        const idx = Math.min(frames.length - 1, Math.floor((i / Math.max(1, targetLen - 1)) * (frames.length - 1)));
+        const f = frames[idx], dh = f.dominant, ndh = f.nonDominant;
+        const hs = HANDSHAPE_SPECS[dh?.handshape] || HANDSHAPE_SPECS['Open O'];
+        const avgCurl = hs.curl.reduce((a, b) => a + b, 0) / 4;
+        let palmScale = 1.0;
+        if (useNorm && dh?.landmarks?.length >= 10) {
+          palmScale = Math.max(0.035, Math.hypot(dh.landmarks[9].x - dh.landmarks[0].x, dh.landmarks[9].y - dh.landmarks[0].y) * 14);
+        }
+        seq.push([
+          ((dh?.wrist?.x ?? 0.5) - (ndh?.wrist?.x ?? 0.5)) / palmScale,
+          ((dh?.wrist?.y ?? 0.5) - (ndh?.wrist?.y ?? 0.65)) / palmScale,
+          ndh ? 1 : 0, ndh?.palm === 'down' ? 1 : 0, dh?.palm === 'up' ? 1 : 0,
+          avgCurl, hs.spread, hs.aperture, hs.flatClamp ? 1 : 0
+        ]);
+      }
+      return seq;
+    }
+
+    function dtwDistance(seqA, seqB) {
+      const n = seqA.length, m = seqB.length;
+      if (!n || !m) return 999;
+      const dp = Array.from({ length: n + 1 }, () => new Float64Array(m + 1).fill(Infinity));
+      dp[0][0] = 0;
+      for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+          let d = 0;
+          for (let k = 0; k < seqA[i - 1].length; k++) { const diff = seqA[i - 1][k] - seqB[j - 1][k]; d += diff * diff; }
+          dp[i][j] = Math.sqrt(d) + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+      }
+      return dp[n][m] / (n + m);
+    }
+
+    function buildPrototypesFromSamples(sampleList) {
+      const byObj = new Map(), dyList = [];
+      for (const smp of sampleList) {
+        const seq = extractNormalizedSequence(smp.frames, 18);
+        if (!seq.length) continue;
+        const key = smp.objectId || smp.dhShape;
+        if (!byObj.has(key)) byObj.set(key, { key, label: smp.label, handshape: smp.dhShape, ruleId: smp.ruleId, seqs: [] });
+        byObj.get(key).seqs.push(seq);
+        const mid = Math.floor(smp.frames.length * 0.45);
+        const dy = (smp.frames[smp.frames.length - 1]?.dominant?.wrist?.y ?? 0.6) - (smp.frames[mid]?.dominant?.wrist?.y ?? 0.4);
+        if (dy > 0.05) dyList.push(dy);
+      }
+      const prototypes = [];
+      for (const grp of byObj.values()) {
+        const T = grp.seqs[0].length, D = grp.seqs[0][0].length;
+        const centroid = Array.from({ length: T }, (_, t) => Array.from({ length: D }, (_, d) => grp.seqs.reduce((acc, s) => acc + s[t][d], 0) / grp.seqs.length));
+        prototypes.push({ key: grp.key, label: grp.label, handshape: grp.handshape, ruleId: grp.ruleId, count: grp.seqs.length, centroid });
+      }
+      const learnedDy = dyList.length ? Number((dyList.reduce((a, b) => a + b, 0) / dyList.length).toFixed(3)) : 0.18;
+      return { prototypes, learnedDy };
+    }
+
+    async function trainSelfLearningModel() {
+      if (!state.samples.length) return;
+      const { prototypes, learnedDy } = buildPrototypesFromSamples(state.samples);
+      const signers = new Set(state.samples.map(s => s.signerId || 'D01'));
+      let correct = 0;
+      for (const smp of state.samples) {
+        const seq = extractNormalizedSequence(smp.frames, 18);
+        let best = null, bestDist = Infinity;
+        for (const p of prototypes) { const d = dtwDistance(seq, p.centroid); if (d < bestDist) { bestDist = d; best = p; } }
+        if (best && (best.key === (smp.objectId || smp.dhShape) || best.handshape === smp.dhShape)) correct++;
+      }
+      const acc = Math.round((correct / state.samples.length) * 100);
+      state.trainedModel = { trainedAt: new Date().toLocaleTimeString('zh-TW', { hour12: false }), sampleCount: state.samples.length, signerCount: signers.size, accuracy: acc, learnedDy, prototypes };
+      await idbPut('config', { key: 'trainedModel', data: state.trainedModel });
+      await appendLearningLog(`⚡ DTW 自主訓練完成：${state.samples.length} 筆樣本（${signers.size} 位語者）、${prototypes.length} 個手語原型，一致率 ${acc}%`);
+      renderLearnTab();
+    }
+
+    async function generateMultiSignerDemoCorpus() {
+      const profiles = [
+        { id: 'D01', scale: 0.94, yShift: -0.02, speedMul: 0.92, note: '手掌較小、動作偏快' },
+        { id: 'D02', scale: 1.05, yShift:  0.00, speedMul: 1.00, note: '標準體型、自然語速' },
+        { id: 'D03', scale: 1.14, yShift:  0.03, speedMul: 1.15, note: '手掌較大、放置偏低稍慢' }
+      ];
+      const targetObjs = state.objects.slice(0, 6);
+      let added = 0;
+      for (const prof of profiles) {
+        for (const obj of targetObjs) {
+          for (let rep = 1; rep <= 2; rep++) {
+            const frames = synthesizeSequence({ objectId: obj.id }, 15, 2.4 * prof.speedMul);
+            frames.forEach(f => {
+              const jx = (Math.random() - 0.5) * 0.015, jy = (Math.random() - 0.5) * 0.015;
+              if (f.dominant) { f.dominant.wrist.x += jx; f.dominant.wrist.y += prof.yShift + jy; f.dominant.landmarks = generateHand21(f.dominant.wrist.x, f.dominant.wrist.y, f.dominant.handshape, f.dominant.palm, state.handedness === 'right', prof.scale); }
+              if (f.nonDominant) { f.nonDominant.wrist.y += prof.yShift; f.nonDominant.landmarks = generateHand21(f.nonDominant.wrist.x, f.nonDominant.wrist.y, f.nonDominant.handshape, f.nonDominant.palm, state.handedness !== 'right', prof.scale); }
+            });
+            const smp = { id: `ms_${prof.id}_${obj.id}_r${rep}`, label: `${obj.name}放在桌子上`, signerId: prof.id, objectId: obj.id, ruleId: obj.ruleId, dhShape: obj.handshape, dhPalm: obj.palm, ndhMode: obj.ndhMode, handedness: state.handedness, fps: 15, frameCount: frames.length, createdAt: `模擬語者 ${prof.id} 第${rep}次`, frames };
+            state.samples = state.samples.filter(x => x.id !== smp.id);
+            state.samples.unshift(smp); await idbPut('samples', smp); added++;
+          }
+        }
+      }
+      renderAll();
+      await appendLearningLog(`👥 已建立 3 位模擬聾人語者 (D01~D03) 共 ${added} 筆含個體差異語料`);
+      await trainSelfLearningModel();
+      runCrossSignerEvaluation();
+    }
+
+    function runCrossSignerEvaluation() {
+      const box = document.getElementById('losoResultBox');
+      const signerIds = [...new Set(state.samples.map(s => s.signerId || 'D01'))].sort();
+      if (signerIds.length < 2) {
+        box.innerHTML = `<b style="color:var(--warn);">目前僅有 ${signerIds.length} 位語者，請先加入至少 2 位語者樣本或點擊「模擬 3 位聾人」。</b>`;
+        return;
+      }
+      const folds = []; let totC = 0, totP = 0, totN = 0;
+      for (const testSigner of signerIds) {
+        const trainSet = state.samples.filter(s => (s.signerId || 'D01') !== testSigner);
+        const testSet = state.samples.filter(s => (s.signerId || 'D01') === testSigner);
+        if (!trainSet.length || !testSet.length) continue;
+        const { prototypes } = buildPrototypesFromSamples(trainSet);
+        let fc = 0, fp = 0;
+        for (const smp of testSet) {
+          const seq = extractNormalizedSequence(smp.frames, 18);
+          let best = null, bestDist = Infinity;
+          for (const p of prototypes) { const d = dtwDistance(seq, p.centroid); if (d < bestDist) { bestDist = d; best = p; } }
+          if (best && (best.key === (smp.objectId || smp.dhShape) || best.handshape === smp.dhShape)) fc++;
+          if (analyzeLandmarkSequence(smp.frames, smp.objectId).isPut) fp++;
+        }
+        totC += fc; totP += fp; totN += testSet.length;
+        folds.push({ testSigner, trainSigners: signerIds.filter(x => x !== testSigner).join('+'), testCount: testSet.length, shapeAcc: Math.round((fc/testSet.length)*100), putAcc: Math.round((fp/testSet.length)*100) });
+      }
+      const overallShapeAcc = Math.round((totC / Math.max(1, totN)) * 100);
+      const overallPutAcc = Math.round((totP / Math.max(1, totN)) * 100);
+      state.lastLosoReport = { tolerance: { ...state.tolerance }, overallShapeAcc, overallPutAcc, totalCount: totN, folds };
+      document.getElementById('btnExportLosoCsv').disabled = false;
+      box.innerHTML = `<div class="between" style="padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:6px;"><b>LOSO 跨語者平均（${signerIds.length} 人 / ${totN} 筆）</b><b style="color:var(--sage);">手形 ${overallShapeAcc}% · 放動詞 ${overallPutAcc}%</b></div>` +
+        folds.map(f => `<div class="between" style="font-family:monospace;"><span>訓練 [${f.trainSigners}] → 測 <b>${f.testSigner}</b> (${f.testCount}筆)</span><span>手形 ${f.shapeAcc}% · 放 ${f.putAcc}%</span></div>`).join('');
+      appendLearningLog(`📊 完成跨語者留一驗證（${signerIds.join('/')}）：手形 ${overallShapeAcc}%、「放」共構 ${overallPutAcc}%`);
+    }
+
+    function exportLosoReport() {
+      const r = state.lastLosoReport; if (!r) return;
+      const lines = ['train_signers,test_signer,test_samples,handshape_acc_pct,put_verb_acc_pct,norm_scale,dy_threshold,contact_tol_pct',
+        ...r.folds.map(f => [f.trainSigners, f.testSigner, f.testCount, f.shapeAcc, f.putAcc, r.tolerance.normalizeScale, r.tolerance.dyMin, Math.round(r.tolerance.contactRatio*100)].join(',')),
+        `OVERALL,ALL,${r.totalCount},${r.overallShapeAcc},${r.overallPutAcc},${r.tolerance.normalizeScale},${r.tolerance.dyMin},${Math.round(r.tolerance.contactRatio*100)}`];
+      triggerDownload(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_cross_signer_evaluation.csv');
+    }
+
+    function matchWithTrainedModel(frames) {
+      if (!state.trainedModel?.prototypes?.length) return null;
+      const seq = extractNormalizedSequence(frames, 18);
+      let best = null, bestDist = Infinity;
+      for (const p of state.trainedModel.prototypes) { const d = dtwDistance(seq, p.centroid); if (d < bestDist) { bestDist = d; best = p; } }
+      if (!best) return null;
+      return { label: best.label, handshape: best.handshape, distance: bestDist, similarity: Math.max(0, Math.min(99, Math.round(Math.exp(-bestDist * 1.45) * 100))) };
+    }
+
+    async function handleLearnVideoUpload(event) {
+      const file = event.target.files?.[0]; if (!file) return;
+      const statusEl = document.getElementById('learnVidStatus');
+      const objId = document.getElementById('learnVidObjSelect').value || state.objects[0].id;
+      const obj = state.objects.find(o => o.id === objId) || state.objects[0];
+      const label = document.getElementById('learnVidLabel').value.trim() || `${obj.name}放在桌子上（影片學習）`;
+      const signerId = (document.getElementById('learnVidSignerId')?.value || 'D01').trim() || 'D01';
+      statusEl.textContent = `正在逐幀解析語者 ${signerId} 影片「${file.name}」...`;
+      try {
+        const url = URL.createObjectURL(file);
+        const vid = document.createElement('video');
+        vid.src = url; vid.muted = true; vid.playsInline = true;
+        await new Promise((res, rej) => { vid.onloadedmetadata = res; vid.onerror = rej; });
+        const dur = Math.min(5.0, Math.max(1.2, vid.duration || 2.5)), fps = 12, total = Math.round(dur * fps);
+        const extracted = [];
+        const dhTarget = state.handedness === 'right' ? 'Right' : 'Left';
+        let mpTs = Math.round(performance.now()) + 5000;
+
+        if (window.realMediaPipe?.ready && window.realMediaPipe.detector) {
+          for (let i = 0; i < total; i++) {
+            vid.currentTime = Math.min(dur - 0.04, i / fps);
+            await new Promise(r => { vid.onseeked = r; setTimeout(r, 150); });
+            mpTs += Math.round(1000 / fps);
+            const res = window.realMediaPipe.detector.detectForVideo(vid, mpTs);
+            let dh = null, ndh = null;
+            (res.landmarks || []).forEach((lm, idx) => {
+              const rawLabel = res.handedness?.[idx]?.[0]?.categoryName || 'Right';
+              const pts = lm.map(p => ({ x: 1 - p.x, y: p.y, z: p.z }));
+              const hand = { side: rawLabel, handshape: classifyRealHandshape(lm), palm: detectPalmOrientation(lm, rawLabel), wrist: { x: pts[0].x, y: pts[0].y }, landmarks: pts };
+              if (rawLabel === dhTarget) dh = hand; else ndh = hand;
+            });
+            if (dh) extracted.push({ frameIndex: i, timestampMs: Math.round((i / fps) * 1000), phase: 'video_mp', handedness: state.handedness, dominant: dh, nonDominant: ndh });
+          }
+        }
+        URL.revokeObjectURL(url);
+
+        const usedRealMp = extracted.length >= 6;
+        const frames = usedRealMp ? extracted : synthesizeSequence({ objectId: obj.id }, fps, dur);
+        const smp = {
+          id: 'vid_' + Date.now(), label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+          dhShape: frames[frames.length - 1]?.dominant?.handshape || obj.handshape,
+          dhPalm: frames[frames.length - 1]?.dominant?.palm || obj.palm,
+          ndhMode: obj.ndhMode, handedness: state.handedness, fps, frameCount: frames.length,
+          createdAt: usedRealMp ? `MediaPipe 語者 ${signerId} (${file.name})` : `影片語者 ${signerId} (${file.name})`, frames
+        };
+        state.samples.unshift(smp); await idbPut('samples', smp);
+        renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
+        statusEl.textContent = usedRealMp
+          ? `✅ MediaPipe 成功抽取語者 ${signerId} 共 ${frames.length} 幀真實雙手骨架並重新訓練！`
+          : `✅ 已建立語者 ${signerId} 共 ${frames.length} 幀語料樣本並重新訓練！`;
+        await appendLearningLog(`🎬 影片自學：語者 ${signerId}「${file.name}」→「${label}」(${usedRealMp ? '真實 MediaPipe' : '輔助模板'} ${frames.length} 幀)`);
+        await trainSelfLearningModel();
+        if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) {
+          statusEl.textContent += ' 正在同步至 Google 試算表與硬碟...';
+          await syncUploadSampleToGs(smp, file, `${signerId}_${file.name}`);
+        }
+      } catch (err) { statusEl.textContent = '解析失敗：' + err.message; }
+      event.target.value = '';
+    }
+
+    const SHAPE_ONTOLOGY = [
+      { keywords: ['衣','褲','被','巾','毯','襪','布','圍巾','枕頭','毛衣','外套','袋','床單'], ruleIdx: 0, handshape: 'Open B', palm: 'up', shapeDesc: '柔軟／無固定幾何外形', reason: '屬於柔軟可變形物體，無固定外形，依規則一使用獨立詞彙「放 (8-084)」（雙手掌心朝上疊放）。', conf: 94 },
+      { keywords: ['果','橘','橙','桃','蛋','梨','番茄','檸檬','洋蔥','棒球','網球','蘋果','李子'], ruleIdx: 1, handshape: 'Open O', palm: 'up', shapeDesc: '中小圓球形', reason: '中小圓形物體，依規則二／三選用 Open O（掌心朝上）放於非主手 Open B 上。', conf: 91 },
+      { keywords: ['西瓜','籃球','足球','排球','哈密瓜','柚子','南瓜','鍋','碗','安全帽','頭盔','地球儀','盆'], ruleIdx: 2, handshape: 'Bent 5', palm: 'up', shapeDesc: '大圓球體／大口徑圓物', reason: '體積明顯大於蘋果，依規則三改用更張開的 Bent 5（掌心朝上）共構放置。', conf: 93 },
+      { keywords: ['書','本','手機','平板','筆電','電腦','字典','盒','箱','磚','盤','菜單','相框','筆記'], ruleIdx: 2, handshape: 'Bent C', palm: 'up', shapeDesc: '扁平四方形／板狀物', reason: '具有明顯扁平四方外形，依規則三切換為 Bent C（掌心朝上）放置。', conf: 92 },
+      { keywords: ['杯','瓶','壺','罐','桶','保溫','水壺','馬克杯','酒瓶','飲料','茶杯'], ruleIdx: 2, handshape: 'C', palm: 'up', shapeDesc: '圓柱形容器', reason: '直立圓柱外形，依規則三選用 C 手式共構放置。', conf: 93 },
+      { keywords: ['筆','筷','尺','棒','傘','牙刷','湯匙','叉子','吸管','遙控器','笛'], ruleIdx: 2, handshape: '1', palm: 'up', shapeDesc: '細長條狀物', reason: '細長線性外形，依規則三選用 1（細長代形詞）放置。', conf: 90 },
+      { keywords: ['紙','卡','票','信','照片','鑰匙','硬幣','名片','悠遊卡','鈔票'], ruleIdx: 2, handshape: 'Flat O', palm: 'up', shapeDesc: '極薄片狀／扁小物件', reason: '極薄片狀物件，依規則三建議採用 Flat O (萬) 扁小捏持代形詞。', conf: 89 }
+    ];
+
+    function saveGeminiKey(val) {
+      const k = (val || '').trim();
+      if (k) { localStorage.setItem('TSL_GEMINI_KEY', k); document.getElementById('geminiKeyStatus').textContent = '✅ 已啟用 Gemini 2.5 Flash 雲端推理'; }
+      else { localStorage.removeItem('TSL_GEMINI_KEY'); document.getElementById('geminiKeyStatus').textContent = '使用內建離線常識引擎'; }
+    }
+
+    function quickInfer(text) { document.getElementById('inferNounInput').value = text; runAiCommonsenseInference(); }
+
+    async function runAiCommonsenseInference() {
+      const raw = document.getElementById('inferNounInput').value.trim(); if (!raw) return;
+      const noun = raw.replace(/放在桌子上|放在桌上|放在|桌子上|桌上|桌子|放/g, '').trim() || raw;
+      const apiKey = localStorage.getItem('TSL_GEMINI_KEY');
+      let proposal = null;
+
+      if (apiKey) {
+        document.getElementById('geminiKeyStatus').textContent = 'Gemini 推理中...';
+        try {
+          const rulesPrompt = state.rules.map(r => `- ${r.id} (${r.code} ${r.name}): ${r.condition}`).join('\n');
+          const prompt = `你是台灣手語（TSL）語言學研究助手。使用者要判斷「${noun}放在桌子上」這句話中「放」的動作規則。\n目前規則庫：\n${rulesPrompt}\n可用手形：Open B, Open O, Bent 5, Bent C, C, 1, Flat O。\n請只回傳 JSON：{"shapeDesc":"物體外形描述","ruleId":"rule_1或rule_2或rule_3或規則id","handshape":"手形名","palm":"up","confidence":92,"reasoning":"用繁體中文解釋為何選這個規則與手形"}`;
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: 'application/json' } })
+          });
+          const data = await resp.json();
+          const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (txt) {
+            const j = JSON.parse(txt);
+            proposal = {
+              noun, sentence: `${noun}放在桌子上`, shapeDesc: j.shapeDesc || 'Gemini 推論外形',
+              ruleId: state.rules.some(r => r.id === j.ruleId) ? j.ruleId : state.rules[2].id,
+              handshape: HANDSHAPE_SPECS[j.handshape] ? j.handshape : 'Bent C',
+              palm: j.palm === 'down' ? 'down' : 'up',
+              confidence: j.confidence || 92,
+              reasoning: `[Gemini 2.5 Flash 雲端推理] ${j.reasoning || ''}`
+            };
+          }
+          document.getElementById('geminiKeyStatus').textContent = '✅ 已啟用 Gemini 2.5 Flash 雲端推理';
+        } catch (err) {
+          document.getElementById('geminiKeyStatus').textContent = `Gemini 連線失敗，改用離線引擎 (${err.message})`;
+        }
+      }
+
+      if (!proposal) {
+        let match = null;
+        for (const e of SHAPE_ONTOLOGY) if (e.keywords.some(kw => noun.includes(kw))) { match = e; break; }
+        const r = match ? (state.rules[match.ruleIdx] || state.rules[0]) : (state.rules[2] || state.rules[0]);
+        proposal = {
+          noun, sentence: `${noun}放在桌子上`, shapeDesc: match ? match.shapeDesc : '未分類新物件',
+          ruleId: r.id, handshape: match ? match.handshape : 'Bent C', palm: match ? match.palm : 'up',
+          confidence: match ? match.conf : 72,
+          reasoning: match ? `[離線外形常識推論] 「${noun}」屬【${match.shapeDesc}】。${match.reason}` : `暫先推測為規則三（Bent C），請由研究者審核修正！`
+        };
+      }
+
+      state.currentProposal = proposal;
+      document.getElementById('aiProposalCard').classList.remove('hidden');
+      document.getElementById('propTitle').textContent = `AI 自學提案：「${proposal.sentence}」`;
+      document.getElementById('propConfidence').textContent = `推論信心 ${proposal.confidence}%`;
+      document.getElementById('propReasoning').textContent = proposal.reasoning;
+      document.getElementById('propRuleSelect').innerHTML = state.rules.map(r => `<option value="${r.id}">${r.code}：${r.name}</option>`).join('');
+      document.getElementById('propRuleSelect').value = proposal.ruleId;
+      document.getElementById('propShapeSelect').value = proposal.handshape;
+      document.getElementById('propPalmSelect').value = proposal.palm;
+    }
+
+    async function approveAiProposal(goAvatar = false) {
+      const p = state.currentProposal; if (!p) return;
+      const rId = document.getElementById('propRuleSelect').value, sh = document.getElementById('propShapeSelect').value, pm = document.getElementById('propPalmSelect').value;
+      const rule = state.rules.find(r => r.id === rId) || state.rules[0], ndhMode = rule.coMode === 'lexical_put' ? 'Open B_up' : 'Open B_down';
+      const corrected = (rId !== p.ruleId || sh !== p.handshape || pm !== p.palm);
+      let obj = state.objects.find(o => o.name === p.noun);
+      if (obj) { obj.ruleId = rId; obj.handshape = sh; obj.palm = pm; obj.ndhMode = ndhMode; }
+      else { obj = { id: 'obj_ai_' + Date.now(), name: p.noun, shapeDesc: p.shapeDesc, lexicalGloss: `${p.noun}（AI 自學）`, ruleId: rId, handshape: sh, palm: pm, ndhMode, note: `AI 推論並經研究者${corrected ? '修正' : '核准'}` }; state.objects.push(obj); }
+      const smp = { id: 'ai_smp_' + Date.now(), label: `${obj.name}放在桌子上`, objectId: obj.id, ruleId: obj.ruleId, dhShape: obj.handshape, dhPalm: obj.palm, ndhMode, frameCount: 38, createdAt: corrected ? 'AI 自學＋研究者修正' : 'AI 舉一反三核准', frames: synthesizeSequence({ objectId: obj.id }, 15, 2.5) };
+      state.samples.unshift(smp); await persistConfig(); await idbPut('samples', smp);
+      await appendLearningLog(corrected ? `✏️ 糾錯學習：「${obj.name}」原推 ${p.handshape} → 修正為【${rule.code} / ${sh}】` : `✅ AI 自主學會：「${obj.name}放在桌子上」→【${rule.code} / ${sh}】`);
+      document.getElementById('aiProposalCard').classList.add('hidden'); state.currentProposal = null;
+      renderAll(); await trainSelfLearningModel();
+      if (goAvatar) previewObjectInAvatar(obj.name);
+    }
+
+    function rejectAiProposal() { if (state.currentProposal) appendLearningLog(`✕ 駁回提案：「${state.currentProposal.noun}」`); document.getElementById('aiProposalCard').classList.add('hidden'); state.currentProposal = null; }
+    async function appendLearningLog(msg) { state.learningLog.unshift(`[${new Date().toLocaleTimeString('zh-TW', { hour12: false })}] ${msg}`); if (state.learningLog.length > 30) state.learningLog.pop(); await idbPut('config', { key: 'learningLog', data: state.learningLog }); renderLearnTab(); }
+
+    function renderLearnTab() {
+      const sel = document.getElementById('learnVidObjSelect');
+      if (sel) sel.innerHTML = state.objects.map(o => `<option value="${o.id}">對應物件：${o.name} (${o.handshape})</option>`).join('');
+      const m = state.trainedModel;
+      if (m) {
+        document.getElementById('trainedModelBadge').textContent = `已訓練 · ${m.accuracy}%`;
+        document.getElementById('mlTrainCount').textContent = `${m.sampleCount} / ${m.signerCount || 1}人`;
+        document.getElementById('mlTrainAcc').textContent = `${m.accuracy}%`;
+        document.getElementById('mlLearnedDy').textContent = `+${m.learnedDy}`;
+        document.getElementById('mlPrototypeReport').innerHTML = `<b>已學習 ${m.prototypes.length} 個手語原型（${m.trainedAt}）：</b> ` + m.prototypes.map(p => `${p.label}[${p.handshape}]`).join('、');
+      }
+      if (state.learningLog.length) document.getElementById('learningLogBox').innerHTML = state.learningLog.map(l => `<div>${l}</div>`).join('');
+    }
+
+    function switchTab(t) {
+      state.activeTab = t;
+      ['record','rules','recognize','avatar','learn'].forEach(k => document.getElementById('tab-'+k).classList.toggle('hidden', k!==t));
+      document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('data-active', String(b.dataset.tab===t)));
+      if (t === 'learn') renderLearnTab();
+    }
+    function setHandedness(h) {
+      state.handedness = h;
+      document.getElementById('btnRightHanded').classList.toggle('btn-primary', h==='right');
+      document.getElementById('btnLeftHanded').classList.toggle('btn-primary', h==='left');
+      renderAvatarSidePanel();
+    }
+    // =========================================================================
+    // GOOGLE SHEETS CLOUD DATABASE + LINGUISTIC ANNOTATION CSV + DEAF EVAL
+    // =========================================================================
+    state.avatarMode = 'rule';
+    state.avatarLmFrames = [];
+    state.avatarLmTitle = '';
+    state.evaluations = [];
+
+    function r3(v) { return Math.round((Number(v) || 0) * 1000) / 1000; }
+
+    // Compress landmark sequence cleanly to <= 44,000 chars (well below Google Sheets 50,000-char cell limit!)
+    function packFramesForSheet(frames, maxFrames = 48) {
+      if (!frames || !frames.length) return '[]';
+      const live = frames.filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
+      const src = live.length >= 5 ? live : frames;
+      const encode = (limit) => {
+        const out = [];
+        const n = Math.min(limit, src.length);
+        for (let i = 0; i < n; i++) {
+          const idx = n === 1 ? 0 : Math.min(src.length - 1, Math.round((i / (n - 1)) * (src.length - 1)));
+          const f = src[idx];
+          const packHand = (h) => h ? [
+            h.side === 'Left' ? 'L' : 'R',
+            h.handshape || 'Open O',
+            h.palm === 'up' ? 'u' : (h.palm === 'down' ? 'd' : 'i'),
+            (h.landmarks || []).slice(0, 21).flatMap(p => [r3(p.x), r3(p.y)])
+          ] : null;
+          const p = f.pose ? [r3(f.pose.nose?.x ?? 0.5), r3(f.pose.nose?.y ?? 0.28), r3(f.pose.shMid?.x ?? 0.5), r3(f.pose.shMid?.y ?? 0.56), r3(f.pose.shWidth ?? 0.30)] : null;
+          const fc = f.face ? [r3(f.face.browUp || 0), r3(f.face.mouthOpen || 0)] : null;
+          out.push([i, Math.round(f.timestampMs || i * 66), packHand(f.dominant), packHand(f.nonDominant), p, fc]);
+        }
+        return JSON.stringify(out);
+      };
+      let str = encode(maxFrames);
+      if (str.length > 45000) str = encode(32);
+      if (str.length > 45000) str = encode(20);
+      return str;
+    }
+
+    function unpackFramesFromSheet(compactStr, handedness = 'right') {
+      try {
+        const arr = typeof compactStr === 'string' ? JSON.parse(compactStr) : compactStr;
+        if (!Array.isArray(arr)) return [];
+        const unpackHand = (h) => {
+          if (!h) return null;
+          const flat = h[3] || [];
+          const landmarks = [];
+          for (let k = 0; k + 1 < flat.length; k += 2) landmarks.push({ x: flat[k], y: flat[k + 1], z: 0 });
+          return {
+            side: h[0] === 'L' ? 'Left' : 'Right',
+            handshape: h[1],
+            palm: h[2] === 'u' ? 'up' : (h[2] === 'd' ? 'down' : 'in'),
+            wrist: landmarks[0] || { x: 0.5, y: 0.5 },
+            landmarks
+          };
+        };
+        return arr.map(row => ({
+          frameIndex: row[0],
+          timestampMs: row[1],
+          phase: 'live',
+          handedness,
+          dominant: unpackHand(row[2]),
+          nonDominant: unpackHand(row[3]),
+          pose: row[4] ? { nose: { x: row[4][0], y: row[4][1] }, shMid: { x: row[4][2], y: row[4][3] }, shWidth: row[4][4] } : null,
+          face: row[5] ? { browUp: row[5][0], mouthOpen: row[5][1] } : null
+        }));
+      } catch (e) { return []; }
+    }
+
+    function getGsEndpoint() {
+      return (localStorage.getItem('TSL_GS_ENDPOINT') || '').trim();
+    }
+
+    function saveGsEndpoint(val) {
+      const url = (val || '').trim();
+      const badge = document.getElementById('gsStatusBadge');
+      if (url && url.startsWith('https://')) {
+        localStorage.setItem('TSL_GS_ENDPOINT', url);
+        if (badge) { badge.textContent = '✅ 已綁定試算表'; badge.style.color = 'var(--sage)'; }
+        document.getElementById('gsSyncMessage').textContent = '已記住 Google 試算表網址，點「連線測試」即可確認連線！';
+      } else {
+        localStorage.removeItem('TSL_GS_ENDPOINT');
+        if (badge) { badge.textContent = '尚未設定網址'; badge.style.color = 'var(--muted)'; }
+      }
+    }
+
+    function buildSheetRowFromSample(s) {
+      const rule = state.rules.find(r => r.id === s.ruleId);
+      const analysis = s.frames?.length >= 5 ? analyzeLandmarkSequence(s.frames, s.objectId) : null;
+      const startMs = s.frames?.[0]?.timestampMs || 0;
+      const endMs = s.frames?.[s.frames.length - 1]?.timestampMs || 0;
+      const maxBrow = (s.frames || []).reduce((m, f) => Math.max(m, f?.face?.browUp || 0), 0);
+      const dyMatch = (analysis?.trajSummary || '').match(/Δy=\+?(-?[\d.]+)/);
+      return {
+        sample_id: s.id,
+        signer_id: s.signerId || 'D01',
+        clip_type: s.clipType || 'sentence',
+        label: s.label || '',
+        object_id: s.objectId || '',
+        rule_code: rule ? rule.code : (s.clipType === 'word_noun' ? '單詞名詞' : (s.clipType === 'word_loc' ? '單詞處所' : '自訂')),
+        dh_shape: s.dhShape || '',
+        dh_palm: s.dhPalm || 'up',
+        ndh_mode: s.ndhMode || '',
+        handedness: s.handedness || 'right',
+        fps: s.fps || 15,
+        frame_count: s.frameCount || (s.frames?.length || 0),
+        start_ms: startMs,
+        end_ms: endMs,
+        ndh_hold_pct: analysis?.ndhHoldScore || 0,
+        path_dy: dyMatch ? Number(dyMatch[1]) : 0,
+        brow_up_max: r3(maxBrow),
+        is_put_verified: Boolean(analysis?.isPut),
+        video_url: s.videoUrl || '',
+        created_at: s.createdAt || new Date().toISOString(),
+        compact_landmarks: packFramesForSheet(s.frames, 48)
+      };
+    }
+
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const s = String(reader.result || '');
+          const idx = s.indexOf(',');
+          resolve(idx >= 0 ? s.slice(idx + 1) : s);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function uploadVideoBlobToDrive(blob, smp, customFileName) {
+      const url = getGsEndpoint();
+      if (!url || !blob) return null;
+      const mb = blob.size / (1024 * 1024);
+      if (mb > 12) {
+        document.getElementById('gsSyncMessage').textContent = `⚠️ 影片大小 ${mb.toFixed(1)} MB 超過單檔 12 MB 上限（骨架已存入 Google 試算表，影片請本機保留）。`;
+        return null;
+      }
+      document.getElementById('gsSyncMessage').textContent = `🎬 正在上傳影片（${mb.toFixed(2)} MB）至 Google 硬碟「TSL_PUT_影片語料庫」...`;
+      try {
+        const b64 = await blobToBase64(blob);
+        const safeSigner = (smp?.signerId || 'D01').replace(/[^\w\-]/g, '');
+        const safeLabel = (smp?.label || 'tsl_clip').replace(/[\\/:*?"<>|\s]+/g, '_');
+        const mime = blob.type || 'video/webm';
+        const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('quicktime') ? 'mov' : 'webm');
+        const fileName = customFileName || `${safeSigner}_${safeLabel}_${Date.now()}.${ext}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'upload_video',
+            sample_id: smp?.id || '',
+            signer_id: smp?.signerId || 'D01',
+            label: smp?.label || '',
+            mime_type: mime,
+            file_name: fileName,
+            base64_data: b64
+          })
+        });
+        const data = await res.json();
+        if (data.ok && data.file_url) {
+          if (smp) {
+            smp.videoUrl = data.file_url;
+            await idbPut('samples', smp);
+            renderSampleList();
+          }
+          document.getElementById('gsSyncMessage').innerHTML =
+            `✅ 骨架已進試算表 ＋ 影片已存入 Google 硬碟！<a href="${data.file_url}" target="_blank" style="color:var(--primary);font-weight:700;margin-left:6px;">🎬 開啟硬碟影片</a>`;
+          return data.file_url;
+        }
+        throw new Error(data.error || '硬碟寫入失敗');
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `⚠️ 骨架已入試算表，但影片上傳 Google 硬碟失敗（請確認 Apps Script 已重新部署並允許硬碟權限）：${err.message}`;
+        return null;
+      }
+    }
+
+    async function testGsConnection() {
+      const url = document.getElementById('gsEndpointInput')?.value.trim() || getGsEndpoint();
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先貼上 Google Apps Script 部署後的 /exec 網址。'; return; }
+      saveGsEndpoint(url);
+      document.getElementById('gsSyncMessage').textContent = '正在連線 Google 試算表與硬碟...';
+      try {
+        const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}action=ping`);
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('gsStatusBadge').textContent = `✅ 雲端 ${data.sampleCount} 筆`;
+          const folderLink = data.videoFolderUrl
+            ? ` · <a href="${data.videoFolderUrl}" target="_blank" style="color:var(--primary);font-weight:700;">📁 開啟「${data.videoFolder}」硬碟資料夾</a>`
+            : '';
+          document.getElementById('gsSyncMessage').innerHTML = `✅ 連線成功！試算表內有 ${data.sampleCount} 筆語料、${data.evalCount} 筆評估${folderLink}`;
+        } else throw new Error(data.error || '未知錯誤');
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `連線失敗（請確認 Apps Script 已部署為「所有人」存取）：${err.message}`;
+      }
+    }
+
+    async function syncUploadSampleToGs(smp, videoBlob = null, customVideoName = null) {
+      const url = getGsEndpoint(); if (!url || !smp) return;
+      document.getElementById('gsSyncMessage').textContent = `☁️ 正在上傳「${smp.label}」至 Google 試算表...`;
+      try {
+        const row = buildSheetRowFromSample(smp);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'upsert_sample', sample: row })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('gsSyncMessage').textContent = `✅ 已同步至 Google 試算表：「${smp.label}」（${Math.round(row.compact_landmarks.length / 1024 * 10) / 10} KB）`;
+          if (videoBlob && document.getElementById('chkUploadVideoToDrive')?.checked) {
+            await uploadVideoBlobToDrive(videoBlob, smp, customVideoName);
+          }
+        } else throw new Error(data.error || '寫入失敗');
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `上傳失敗（資料已安全保存在本機）：${err.message}`;
+      }
+    }
+
+    async function syncUploadAllToGs() {
+      const url = getGsEndpoint();
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先貼上 Google Apps Script 網址並儲存。'; return; }
+      const realOnly = state.samples.filter(s => !String(s.id).startsWith('demo_'));
+      const targets = realOnly.length ? realOnly : state.samples;
+      document.getElementById('gsSyncMessage').textContent = `☁️ 正在批次上傳 ${targets.length} 筆語料到 Google 試算表...`;
+      try {
+        const rows = targets.map(buildSheetRowFromSample);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'upsert_batch', samples: rows })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('gsSyncMessage').textContent = `✅ 成功同步 ${data.count} 筆語料到 Google 試算表！`;
+        } else throw new Error(data.error || '批次上傳失敗');
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `批次上傳失敗：${err.message}`;
+      }
+    }
+
+    async function syncPullFromGs() {
+      const url = getGsEndpoint();
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先貼上 Google Apps Script 網址並儲存。'; return; }
+      document.getElementById('gsSyncMessage').textContent = '🔄 正在從 Google 試算表下載同步所有語者語料...';
+      try {
+        const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}action=list`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || '讀取失敗');
+        let merged = 0;
+        for (const r of (data.samples || [])) {
+          const frames = unpackFramesFromSheet(r.compact_landmarks, r.handedness || 'right');
+          if (!frames.length) continue;
+          const obj = state.objects.find(o => o.id === r.object_id) || state.objects[0];
+          const smp = {
+            id: String(r.sample_id),
+            clipType: r.clip_type || 'sentence',
+            label: String(r.label || '雲端語料'),
+            signerId: String(r.signer_id || 'D01'),
+            objectId: r.object_id || obj.id,
+            ruleId: obj.ruleId,
+            dhShape: r.dh_shape || obj.handshape,
+            dhPalm: r.dh_palm || 'up',
+            ndhMode: r.ndh_mode || obj.ndhMode,
+            handedness: r.handedness || 'right',
+            fps: Number(r.fps || 15),
+            frameCount: frames.length,
+            videoUrl: String(r.video_url || ''),
+            createdAt: `☁️ ${r.created_at || '雲端同步'}`,
+            frames
+          };
+          state.samples = state.samples.filter(x => x.id !== smp.id);
+          state.samples.unshift(smp);
+          await idbPut('samples', smp);
+          merged++;
+        }
+        if (Array.isArray(data.evaluations) && data.evaluations.length) {
+          state.evaluations = data.evaluations;
+          await idbPut('config', { key: 'evaluations', data: state.evaluations });
+          renderEvalCount();
+        }
+        renderAll();
+        document.getElementById('gsStatusBadge').textContent = `✅ 已同步 ${merged} 筆`;
+        document.getElementById('gsSyncMessage').textContent = `✅ 已從 Google 試算表同步 ${merged} 筆語料與 ${(data.evaluations || []).length} 筆聾人評估！`;
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `下載同步失敗：${err.message}`;
+      }
+    }
+
+    function copyShareableGsLink() {
+      const url = getGsEndpoint();
+      const base = window.location.href.split('?')[0];
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址，才能產生自動綁定的分享連結！'; return; }
+      const shareUrl = `${base}?api=${encodeURIComponent(url)}`;
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          document.getElementById('gsSyncMessage').textContent = '✅ 已複製專屬分享連結！傳給聾人朋友點開就會自動連到你的試算表。';
+        });
+      } else {
+        prompt('請複製以下專屬連結傳給聾人朋友：', shareUrl);
+      }
+    }
+
+    // Export Standard Linguistic Annotation Table matching Course Final Report Slide 13!
+    function exportLinguisticAnnotationCsv() {
+      if (!state.samples.length) return;
+      const header = 'sample_id,signer_id,clip_type,label,rule_code,variant_id,dh_shape,dh_palm,ndh_mode,handedness,frame_count,start_ms,end_ms,duration_ms,ndh_hold_pct,path_dy,brow_up_max,is_put_verified,created_at';
+      const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = state.samples.map(s => {
+        const r = buildSheetRowFromSample(s);
+        const dur = Math.max(0, r.end_ms - r.start_ms);
+        const variantId = `${r.rule_code}_${r.dh_shape}_${r.ndh_mode}`;
+        return [
+          r.sample_id, r.signer_id, r.clip_type, r.label, r.rule_code, variantId,
+          r.dh_shape, r.dh_palm, r.ndh_mode, r.handedness, r.frame_count,
+          r.start_ms, r.end_ms, dur, r.ndh_hold_pct, r.path_dy, r.brow_up_max,
+          r.is_put_verified ? 'TRUE' : 'FALSE', r.created_at
+        ].map(esc).join(',');
+      });
+      triggerDownload(new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_linguistic_annotations.csv');
+      document.getElementById('recMessage').textContent = `📊 已匯出 ${rows.length} 筆語言學標準標註表（可直接貼入期末報告或 Excel）！`;
+    }
+
+    // Landmark-Driven Side-by-Side Avatar Controls (Ch8 Slide 31)
+    function setAvatarMode(mode) {
+      state.avatarMode = mode;
+      document.getElementById('btnAvModeRule')?.classList.toggle('btn-primary', mode === 'rule');
+      document.getElementById('btnAvModeLm')?.classList.toggle('btn-primary', mode === 'landmark');
+      document.getElementById('avatarRuleInputBar')?.classList.toggle('hidden', mode !== 'rule');
+      document.getElementById('avatarQuickChips')?.classList.toggle('hidden', mode !== 'rule');
+      document.getElementById('avatarLmInputBar')?.classList.toggle('hidden', mode !== 'landmark');
+      if (mode === 'landmark') {
+        refreshAvatarLmSelect();
+        loadAvatarLandmarkSample();
+      }
+      drawAvatarScene();
+    }
+
+    function refreshAvatarLmSelect() {
+      const sel = document.getElementById('avatarLmSampleSelect');
+      if (!sel) return;
+      sel.innerHTML = state.samples.map(s => `<option value="${s.id}">[${s.signerId || 'D01'}] ${s.label} (${s.frameCount}f)</option>`).join('');
+    }
+
+    function loadAvatarLandmarkSample() {
+      const id = document.getElementById('avatarLmSampleSelect')?.value;
+      const smp = state.samples.find(s => s.id === id) || state.samples[0];
+      if (!smp) return;
+      const live = (smp.frames || []).filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
+      state.avatarLmFrames = live.length >= 5 ? live : (smp.frames || []);
+      state.avatarLmTitle = `${smp.label}（語者 ${smp.signerId || 'D01'}）`;
+      state.avatarProgress = 0;
+      state.avatarPlaying = true;
+      drawAvatarScene();
+    }
+
+    // Deaf User 4-Dimension Naturalness Evaluation (Ch8 Slide 26 + Ch10 Slide 18)
+    function renderEvalCount() {
+      const el = document.getElementById('evalStatusMsg');
+      if (el) el.textContent = `已收錄 ${state.evaluations.length} 筆評估（有綁定 Google 試算表將同步上傳）`;
+    }
+
+    async function submitDeafEval() {
+      const sentence = state.avatarMode === 'landmark'
+        ? (state.avatarLmTitle || '真實骨架驅動')
+        : (document.getElementById('avatarSentenceInput')?.value.trim() || '蘋果放在桌子上');
+      const ev = {
+        eval_id: 'ev_' + Date.now(),
+        evaluator_id: (document.getElementById('evalUserId')?.value || 'D01').trim() || 'D01',
+        role: document.getElementById('evalUserRole')?.value || '聾人母語者',
+        sentence,
+        semantic_score: Number(document.getElementById('evalSem')?.value || 5),
+        form_score: Number(document.getElementById('evalForm')?.value || 5),
+        timing_score: Number(document.getElementById('evalTime')?.value || 5),
+        naturalness_score: Number(document.getElementById('evalNat')?.value || 5),
+        comment: (document.getElementById('evalComment')?.value || '').trim(),
+        created_at: new Date().toLocaleString('zh-TW', { hour12: false })
+      };
+      state.evaluations.unshift(ev);
+      await idbPut('config', { key: 'evaluations', data: state.evaluations });
+      document.getElementById('evalComment').value = '';
+      renderEvalCount();
+      const url = getGsEndpoint();
+      if (url) {
+        try {
+          await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'add_eval', evaluation: ev }) });
+          document.getElementById('evalStatusMsg').textContent = `✅ 已儲存並同步至 Google 試算表！（共 ${state.evaluations.length} 筆）`;
+        } catch (e) {}
+      }
+    }
+
+    function exportDeafEvalCsv() {
+      if (!state.evaluations.length) {
+        document.getElementById('evalStatusMsg').textContent = '目前尚無評估紀錄，請先填寫上方分數後按「儲存評估」。';
+        return;
+      }
+      const header = 'eval_id,evaluator_id,role,sentence,semantic_score,form_score,timing_score,naturalness_score,comment,created_at';
+      const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = state.evaluations.map(e => [e.eval_id, e.evaluator_id, e.role, e.sentence, e.semantic_score, e.form_score, e.timing_score, e.naturalness_score, e.comment, e.created_at].map(esc).join(','));
+      triggerDownload(new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_deaf_evaluation.csv');
+    }
+
+    function renderAll() {
+      const opts = state.objects.map(o => `<option value="${o.id}">${o.name} (${o.handshape})</option>`).join('');
+      document.getElementById('recObjectSelect').innerHTML = opts;
+      document.getElementById('simActionSelect').innerHTML = opts;
+      document.getElementById('recObjectSelect').onchange = () => {
+        const o = state.objects.find(x => x.id === document.getElementById('recObjectSelect').value);
+        if (!o) return;
+        document.getElementById('simActionSelect').value = o.id;
+        onClipTypeChange();
+      };
+      document.getElementById('simActionSelect').onchange = () => { document.getElementById('recObjectSelect').value = document.getElementById('simActionSelect').value; document.getElementById('recObjectSelect').onchange(); };
+      document.getElementById('avatarQuickChips').innerHTML = state.objects.map(o => `<button class="btn btn-sm" onclick="document.getElementById('avatarSentenceInput').value='${o.name}放在桌子上';generateAvatarSign();">${o.name}放在桌子上</button>`).join('');
+      renderSampleList(); renderRulesTab(); refreshRecognizerSelects(); refreshAvatarLmSelect(); renderLearnTab(); renderEvalCount();
+      if (!state.avatarPlan) generateAvatarSign(); else renderAvatarSidePanel();
+    }
+
+    (async function init() {
+      await openDatabase();
+      const cfg = await idbGetAll('config');
+      if (cfg.find(c => c.key === 'rules')?.data?.length) state.rules = cfg.find(c => c.key === 'rules').data;
+      if (cfg.find(c => c.key === 'objects')?.data?.length) state.objects = cfg.find(c => c.key === 'objects').data;
+      if (cfg.find(c => c.key === 'trainedModel')?.data) state.trainedModel = cfg.find(c => c.key === 'trainedModel').data;
+      if (cfg.find(c => c.key === 'learningLog')?.data?.length) state.learningLog = cfg.find(c => c.key === 'learningLog').data;
+      if (cfg.find(c => c.key === 'evaluations')?.data?.length) state.evaluations = cfg.find(c => c.key === 'evaluations').data;
+      const savedKey = localStorage.getItem('TSL_GEMINI_KEY');
+      if (savedKey) { document.getElementById('geminiApiKeyInput').value = savedKey; document.getElementById('geminiKeyStatus').textContent = '✅ 已啟用 Gemini 2.5 Flash 雲端推理'; }
+      // Auto-bind Google Sheets endpoint from shareable URL (?api=...) or localStorage!
+      const urlApi = new URLSearchParams(window.location.search).get('api');
+      if (urlApi && urlApi.startsWith('https://')) saveGsEndpoint(urlApi);
+      const savedGs = getGsEndpoint();
+      if (savedGs) {
+        document.getElementById('gsEndpointInput').value = savedGs;
+        document.getElementById('gsStatusBadge').textContent = '✅ 已綁定試算表';
+        document.getElementById('gsStatusBadge').style.color = 'var(--sage)';
+      }
+      const smps = await idbGetAll('samples');
+      if (smps.length) state.samples = smps; else { await persistConfig(); await seedDemoSamples(); }
+      setRecordSource('sim'); renderAll(); runRecLoop(); requestAnimationFrame(runAvatarLoop);
+    })();
+  </script>
+</body>
+</html>
