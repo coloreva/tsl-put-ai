@@ -284,7 +284,7 @@
 
         <input id="sampleSearchInput" type="text" placeholder="🔍 搜尋句型、手形或語者編號（如 D01、西瓜）..." oninput="renderSampleList()" />
 
-        <div class="row">
+        <div id="dbAdminBar" class="row">
           <label class="btn btn-sm" style="cursor:pointer;">
             匯入 JSON / JSONL
             <input type="file" accept=".json,.jsonl,.csv" class="hidden" onchange="handleImportFile(event)" />
@@ -294,10 +294,22 @@
           <button class="btn btn-sm" onclick="resetDemoDatabase()">重載預設</button>
         </div>
 
-        <!-- Google Sheets + Google Drive Cloud Database Panel -->
-        <div class="subcard space-y-sm" style="border-color:var(--sage);">
+        <!-- Participant-Only Clean Banner (shown ONLY when opened via locked participant link!) -->
+        <div id="participantSyncBanner" class="subcard space-y-sm hidden" style="border-color:var(--sage);">
           <div class="between">
-            <span style="font-size:12px;font-weight:700;color:var(--sage);">☁️ Google 試算表 ＋ 硬碟影片資料庫</span>
+            <span style="font-size:12px;font-weight:700;color:var(--sage);">🔒 受試者語料回傳模式（已鎖定後台設定）</span>
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <input id="chkParticipantVideoConsent" type="checkbox" checked onchange="document.getElementById('chkUploadVideoToDrive').checked=this.checked;" />
+              <span>同意同步備份影片</span>
+            </label>
+          </div>
+          <div id="participantSyncStatus" class="muted" style="font-size:11px;">您錄製完按「存入資料庫」後，資料會自動安全回傳給研究者，其他人無法查看您的語料。</div>
+        </div>
+
+        <!-- Google Sheets + Google Drive Cloud Database Panel (Researcher Only) -->
+        <div id="gsAdminPanel" class="subcard space-y-sm" style="border-color:var(--sage);">
+          <div class="between">
+            <span style="font-size:12px;font-weight:700;color:var(--sage);">☁️ Google 試算表 ＋ 硬碟影片資料庫（研究者管理）</span>
             <span id="gsStatusBadge" class="muted" style="font-size:11px;">尚未設定網址</span>
           </div>
           <div class="row">
@@ -318,7 +330,7 @@
             <div class="row" style="gap:6px;">
               <button class="btn btn-sm" onclick="syncUploadAllToGs()">⬆️ 上傳全部</button>
               <button class="btn btn-sm btn-primary" onclick="syncPullFromGs()">⬇️ 同步下載</button>
-              <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製自動綁定試算表的專屬網址給聾人受試者">🔗 分享連結</button>
+              <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製受試者專屬連結（自動隱藏後台設定、禁止下載他人語料）">🔒 複製受試者連結</button>
             </div>
           </div>
           <div id="gsSyncMessage" class="muted" style="font-size:11px;">綁定後，錄影存檔或上傳影片會自動寫入 Google 試算表，並將影片存進你 Google 硬碟的「TSL_PUT_影片語料庫」。</div>
@@ -2502,8 +2514,25 @@
       } catch (e) { return []; }
     }
 
+    function isParticipantMode() {
+      return Boolean(state.participantMode || sessionStorage.getItem('TSL_PARTICIPANT_MODE') === '1');
+    }
+
     function getGsEndpoint() {
+      if (isParticipantMode()) return (sessionStorage.getItem('TSL_GS_PARTICIPANT_EP') || '').trim();
       return (localStorage.getItem('TSL_GS_ENDPOINT') || '').trim();
+    }
+
+    function setSyncStatus(text, researcherHtml = null) {
+      if (isParticipantMode()) {
+        const pe = document.getElementById('participantSyncStatus');
+        if (pe) pe.textContent = text;
+        return;
+      }
+      const ge = document.getElementById('gsSyncMessage');
+      if (!ge) return;
+      if (researcherHtml) ge.innerHTML = researcherHtml;
+      else ge.textContent = text;
     }
 
     function saveGsEndpoint(val) {
@@ -2595,18 +2624,20 @@
         });
         const data = await res.json();
         if (data.ok && data.file_url) {
-          if (smp) {
+          if (smp && !isParticipantMode()) {
             smp.videoUrl = data.file_url;
             await idbPut('samples', smp);
             renderSampleList();
           }
-          document.getElementById('gsSyncMessage').innerHTML =
-            `✅ 骨架已進試算表 ＋ 影片已存入 Google 硬碟！<a href="${data.file_url}" target="_blank" style="color:var(--primary);font-weight:700;margin-left:6px;">🎬 開啟硬碟影片</a>`;
+          setSyncStatus(
+            `✅ 已安全回傳給研究者：「${smp?.label || '語料'}」（含影片備份）！`,
+            `✅ 骨架已進試算表 ＋ 影片已存入 Google 硬碟！<a href="${data.file_url}" target="_blank" style="color:var(--primary);font-weight:700;margin-left:6px;">🎬 開啟硬碟影片</a>`
+          );
           return data.file_url;
         }
         throw new Error(data.error || '硬碟寫入失敗');
       } catch (err) {
-        document.getElementById('gsSyncMessage').textContent = `⚠️ 骨架已入試算表，但影片上傳 Google 硬碟失敗（請確認 Apps Script 已重新部署並允許硬碟權限）：${err.message}`;
+        setSyncStatus(`⚠️ 骨架已安全回傳，但影片備份失敗（請稍後再試）：${err.message}`);
         return null;
       }
     }
@@ -2633,7 +2664,7 @@
 
     async function syncUploadSampleToGs(smp, videoBlob = null, customVideoName = null) {
       const url = getGsEndpoint(); if (!url || !smp) return;
-      document.getElementById('gsSyncMessage').textContent = `☁️ 正在上傳「${smp.label}」至 Google 試算表...`;
+      setSyncStatus(`☁️ 正在安全回傳「${smp.label}」...`);
       try {
         const row = buildSheetRowFromSample(smp);
         const res = await fetch(url, {
@@ -2643,13 +2674,16 @@
         });
         const data = await res.json();
         if (data.ok) {
-          document.getElementById('gsSyncMessage').textContent = `✅ 已同步至 Google 試算表：「${smp.label}」（${Math.round(row.compact_landmarks.length / 1024 * 10) / 10} KB）`;
+          setSyncStatus(
+            `✅ 已安全回傳給研究者：「${smp.label}」`,
+            `✅ 已同步至 Google 試算表：「${smp.label}」（${Math.round(row.compact_landmarks.length / 1024 * 10) / 10} KB）`
+          );
           if (videoBlob && document.getElementById('chkUploadVideoToDrive')?.checked) {
             await uploadVideoBlobToDrive(videoBlob, smp, customVideoName);
           }
         } else throw new Error(data.error || '寫入失敗');
       } catch (err) {
-        document.getElementById('gsSyncMessage').textContent = `上傳失敗（資料已安全保存在本機）：${err.message}`;
+        setSyncStatus(`回傳暫時失敗（資料已保存在您本機）：${err.message}`);
       }
     }
 
@@ -2726,15 +2760,22 @@
     function copyShareableGsLink() {
       const url = getGsEndpoint();
       const base = window.location.href.split('?')[0];
-      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址，才能產生自動綁定的分享連結！'; return; }
-      const shareUrl = `${base}?api=${encodeURIComponent(url)}`;
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址，才能產生受試者專屬連結！'; return; }
+      const encoded = btoa(unescape(encodeURIComponent(url)));
+      const shareUrl = `${base}?mode=participant&k=${encodeURIComponent(encoded)}`;
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(shareUrl).then(() => {
-          document.getElementById('gsSyncMessage').textContent = '✅ 已複製專屬分享連結！傳給聾人朋友點開就會自動連到你的試算表。';
+          document.getElementById('gsSyncMessage').textContent = '🔒 已複製「受試者專屬連結」！對方點開不會看到這個管理面板，也不能下載別人資料，只會自動把自己的錄影安全回傳給你。';
         });
       } else {
-        prompt('請複製以下專屬連結傳給聾人朋友：', shareUrl);
+        prompt('請複製以下受試者專屬連結：', shareUrl);
       }
+    }
+
+    function applyParticipantLockUI() {
+      document.getElementById('gsAdminPanel')?.classList.add('hidden');
+      document.getElementById('dbAdminBar')?.classList.add('hidden');
+      document.getElementById('participantSyncBanner')?.classList.remove('hidden');
     }
 
     // Export Standard Linguistic Annotation Table matching Course Final Report Slide 13!
@@ -2793,7 +2834,9 @@
     // Deaf User 4-Dimension Naturalness Evaluation (Ch8 Slide 26 + Ch10 Slide 18)
     function renderEvalCount() {
       const el = document.getElementById('evalStatusMsg');
-      if (el) el.textContent = `已收錄 ${state.evaluations.length} 筆評估（有綁定 Google 試算表將同步上傳）`;
+      if (el) el.textContent = isParticipantMode()
+        ? `感謝回饋！已送出 ${state.evaluations.length} 筆評估`
+        : `已收錄 ${state.evaluations.length} 筆評估（有綁定 Google 試算表將同步上傳）`;
     }
 
     async function submitDeafEval() {
@@ -2820,7 +2863,9 @@
       if (url) {
         try {
           await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'add_eval', evaluation: ev }) });
-          document.getElementById('evalStatusMsg').textContent = `✅ 已儲存並同步至 Google 試算表！（共 ${state.evaluations.length} 筆）`;
+          document.getElementById('evalStatusMsg').textContent = isParticipantMode()
+            ? `✅ 感謝您的回饋！已安全送出評估（共 ${state.evaluations.length} 筆）`
+            : `✅ 已儲存並同步至 Google 試算表！（共 ${state.evaluations.length} 筆）`;
         } catch (e) {}
       }
     }
@@ -2862,15 +2907,41 @@
       if (cfg.find(c => c.key === 'evaluations')?.data?.length) state.evaluations = cfg.find(c => c.key === 'evaluations').data;
       const savedKey = localStorage.getItem('TSL_GEMINI_KEY');
       if (savedKey) { document.getElementById('geminiApiKeyInput').value = savedKey; document.getElementById('geminiKeyStatus').textContent = '✅ 已啟用 Gemini 2.5 Flash 雲端推理'; }
-      // Auto-bind Google Sheets endpoint from shareable URL (?api=...) or localStorage!
-      const urlApi = new URLSearchParams(window.location.search).get('api');
-      if (urlApi && urlApi.startsWith('https://')) saveGsEndpoint(urlApi);
-      const savedGs = getGsEndpoint();
-      if (savedGs) {
-        document.getElementById('gsEndpointInput').value = savedGs;
-        document.getElementById('gsStatusBadge').textContent = '✅ 已綁定試算表';
-        document.getElementById('gsStatusBadge').style.color = 'var(--sage)';
+
+      // Check Participant Mode (?mode=participant&k=<base64>) or researcher saved endpoint
+      const params = new URLSearchParams(window.location.search);
+      const urlMode = params.get('mode');
+      const urlSigner = params.get('signer');
+      let incomingApi = params.get('api') || '';
+      if (!incomingApi && params.get('k')) {
+        try { incomingApi = decodeURIComponent(escape(atob(params.get('k')))); } catch (e) {}
       }
+
+      if (urlMode === 'participant' || sessionStorage.getItem('TSL_PARTICIPANT_MODE') === '1') {
+        state.participantMode = true;
+        sessionStorage.setItem('TSL_PARTICIPANT_MODE', '1');
+        if (incomingApi && incomingApi.startsWith('https://')) {
+          sessionStorage.setItem('TSL_GS_PARTICIPANT_EP', incomingApi);
+        }
+        if (urlSigner && document.getElementById('recSignerId')) {
+          document.getElementById('recSignerId').value = urlSigner;
+          if (document.getElementById('evalUserId')) document.getElementById('evalUserId').value = urlSigner;
+        }
+        applyParticipantLockUI();
+        // Clean query parameters from address bar so the Apps Script URL is never visible!
+        if (window.location.search && window.history?.replaceState) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } else {
+        if (incomingApi && incomingApi.startsWith('https://')) saveGsEndpoint(incomingApi);
+        const savedGs = getGsEndpoint();
+        if (savedGs) {
+          document.getElementById('gsEndpointInput').value = savedGs;
+          document.getElementById('gsStatusBadge').textContent = '✅ 已綁定試算表';
+          document.getElementById('gsStatusBadge').style.color = 'var(--sage)';
+        }
+      }
+
       const smps = await idbGetAll('samples');
       if (smps.length) state.samples = smps; else { await persistConfig(); await seedDemoSamples(); }
       setRecordSource('sim'); renderAll(); runRecLoop(); requestAnimationFrame(runAvatarLoop);
