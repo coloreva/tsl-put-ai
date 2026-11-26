@@ -188,10 +188,11 @@
 
         <div class="grid-2">
           <div>
-            <label class="field-label">錄製類型（先教單詞，再錄完整句子！）</label>
+            <label class="field-label">錄製類型（可先教 6 種手形與單詞，再錄完整句子！）</label>
             <select id="recClipType" onchange="onClipTypeChange()">
               <option value="sentence">完整句子（物件 → 桌子 → 共構放）</option>
-              <option value="word_noun">單詞教學：物件名詞（如 西瓜、衣服、蘋果、杯子、筆）</option>
+              <option value="word_handshape">🖐️ 手形教學：教 AI 認得 / C /、/ 手 /、/ 一 /、/ 坤 /、/ 同 /、/ 果 /</option>
+              <option value="word_noun">單詞教學：物件名詞（如 西瓜、衣服、蘋果、杯子、筆、鳳梨、報紙、雨傘）</option>
               <option value="word_loc">單詞教學：處所名詞（如 桌子）</option>
             </select>
           </div>
@@ -203,7 +204,7 @@
 
         <div class="grid-2">
           <div>
-            <label class="field-label">句型／單詞文字名稱</label>
+            <label class="field-label">句型／單詞／手形名稱</label>
             <input id="recLabelInput" type="text" value="蘋果放在桌子上" />
           </div>
           <div>
@@ -215,21 +216,21 @@
         <div class="grid-3">
           <div>
             <label class="field-label">預期主手手形</label>
-            <select id="recDhShape">
-              <option value="Open O">Open O (果)</option>
-              <option value="Bent 5">Bent 5 (同)</option>
-              <option value="Bent C">Bent C (紳)</option>
-              <option value="Open B">Open B (手)</option>
-              <option value="C">C (方)</option>
-              <option value="1">1 (一)</option>
-              <option value="Flat O">Flat O (萬)</option>
+            <select id="recDhShape" onchange="onRecDhShapeChange()">
+              <option value="C">/ C /</option>
+              <option value="Open B">/ 手 /</option>
+              <option value="1">/ 一 /</option>
+              <option value="Bent C">/ 坤 /</option>
+              <option value="Bent 5">/ 同 /</option>
+              <option value="Open O">/ 果 /</option>
             </select>
+            <div id="handshapeProtoStatus" class="muted" style="font-size:11px;margin-top:4px;">🧠 尚未錄製手形範例（切到「手形教學」錄 1～2 秒即可教 AI 自動認出）</div>
           </div>
           <div>
             <label class="field-label">非主手共構設定</label>
             <select id="recNdhMode">
-              <option value="Open B_down">Open B 掌心朝下（桌子）</option>
-              <option value="Open B_up">Open B 掌心朝上（一般放）</option>
+              <option value="Open B_down">/ 手 / 掌心朝下（桌子）</option>
+              <option value="Open B_up">/ 手 / 掌心朝上（一般放）</option>
               <option value="none">無共構參照</option>
             </select>
           </div>
@@ -401,15 +402,14 @@
             <div><label class="field-label">適用規則</label><select id="objRuleId"></select></div>
             <div><label class="field-label">原詞彙手語構成</label><input id="objLexicalGloss" type="text" placeholder="如：紅＋水果、書本" /></div>
             <div>
-              <label class="field-label">AI 幾何手形（追蹤用）</label>
+              <label class="field-label">預期主手手形（追蹤用）</label>
               <select id="objHandshape">
-                <option value="Open O">Open O（較小圓形 / 果）</option>
-                <option value="Bent 5">Bent 5（較大立體或大型圓形 / 同）</option>
-                <option value="C">C（/ C / 圓柱形）</option>
-                <option value="Open B">Open B（/ 手 / 平面或一般放）</option>
-                <option value="1">1（/ 一 / 長條形）</option>
-                <option value="Bent C">Bent C（厚四方形 / 紳）</option>
-                <option value="Flat O">Flat O（扁小捏持 / 萬）</option>
+                <option value="C">/ C /</option>
+                <option value="Open B">/ 手 /</option>
+                <option value="1">/ 一 /</option>
+                <option value="Bent C">/ 坤 /</option>
+                <option value="Bent 5">/ 同 /</option>
+                <option value="Open O">/ 果 /</option>
               </select>
             </div>
             <div>
@@ -490,7 +490,7 @@
         <div class="subcard">
           <div class="between"><span style="font-size:12px;font-weight:700;">② 主手手形與張開度分類</span><span id="m2Val" style="font-family:monospace;font-weight:700;">—</span></div>
           <div class="meter-track"><div id="m2Bar" class="meter-fill" style="width:0%"></div></div>
-          <div id="m2Sub" class="muted">區分 Open O / Bent 5 / Bent C / C / 1</div>
+          <div id="m2Sub" class="muted">區分 / C /、/ 手 /、/ 一 /、/ 坤 /、/ 同 /、/ 果 /</div>
         </div>
         <div class="subcard">
           <div class="between"><span style="font-size:12px;font-weight:700;">③ 「放」向下接觸軌跡不變量</span><span id="m3Val" style="font-family:monospace;font-weight:700;">—</span></div>
@@ -745,13 +745,12 @@
             <div>
               <label class="field-label">審核／修正手形</label>
               <select id="propShapeSelect">
-                <option value="Open O">Open O (果)</option>
-                <option value="Bent 5">Bent 5 (同)</option>
-                <option value="Bent C">Bent C (紳)</option>
-                <option value="C">C (方)</option>
-                <option value="1">1 (一)</option>
-                <option value="Flat O">Flat O (萬)</option>
-                <option value="Open B">Open B (手) - 一般放</option>
+                <option value="C">/ C /</option>
+                <option value="Open B">/ 手 /</option>
+                <option value="1">/ 一 /</option>
+                <option value="Bent C">/ 坤 /</option>
+                <option value="Bent 5">/ 同 /</option>
+                <option value="Open O">/ 果 /</option>
               </select>
             </div>
             <div><label class="field-label">掌心方向</label><select id="propPalmSelect"><option value="up">掌心朝上</option><option value="down">掌心朝下</option></select></div>
@@ -846,7 +845,92 @@
       return 'in';
     }
 
+    const HANDSHAPE_ORDER = ['C', 'Open B', '1', 'Bent C', 'Bent 5', 'Open O'];
+    function formatHandshapeTag(code) {
+      const map = { 'C': '/ C /', 'Open B': '/ 手 /', '1': '/ 一 /', 'Bent C': '/ 坤 /', 'Bent 5': '/ 同 /', 'Open O': '/ 果 /', 'Flat O': '/ 坤 /' };
+      return map[code] || `/ ${code || '?'} /`;
+    }
+
+    function dist2(a, b) { return Math.hypot((a?.x || 0) - (b?.x || 0), (a?.y || 0) - (b?.y || 0)); }
+
+    // 11-dim scale-, position-, and Sheets-roundtrip-invariant handshape geometry vector
+    function extractHandshapeFeat(lm) {
+      if (!lm || lm.length < 21) return null;
+      const palmLen = Math.max(0.04, dist2(lm[0], lm[9]));
+      return [
+        dist2(lm[0], lm[8]) / palmLen,
+        dist2(lm[0], lm[12]) / palmLen,
+        dist2(lm[0], lm[16]) / palmLen,
+        dist2(lm[0], lm[20]) / palmLen,
+        dist2(lm[5], lm[8]) / palmLen,
+        dist2(lm[9], lm[12]) / palmLen,
+        dist2(lm[13], lm[16]) / palmLen,
+        dist2(lm[17], lm[20]) / palmLen,
+        dist2(lm[4], lm[8]) / palmLen,
+        (dist2(lm[8], lm[12]) + dist2(lm[12], lm[16]) + dist2(lm[16], lm[20])) / (3 * palmLen),
+        dist2(lm[4], lm[12]) / palmLen
+      ];
+    }
+
+    function rebuildHandshapePrototypes() {
+      const buckets = {};
+      for (const s of (state.samples || [])) {
+        if (s.clipType !== 'word_handshape' || !s.dhShape || !s.frames?.length) continue;
+        const feats = [];
+        for (const f of s.frames) {
+          const lm = f?.dominant?.landmarks || f?.nonDominant?.landmarks;
+          const v = extractHandshapeFeat(lm);
+          if (v) feats.push(v);
+        }
+        if (!feats.length) continue;
+        if (!buckets[s.dhShape]) buckets[s.dhShape] = [];
+        buckets[s.dhShape].push(...feats);
+      }
+      const protos = {};
+      for (const [shape, vecs] of Object.entries(buckets)) {
+        const dims = vecs[0].length;
+        const mean = new Array(dims).fill(0);
+        for (const v of vecs) for (let i = 0; i < dims; i++) mean[i] += v[i];
+        for (let i = 0; i < dims; i++) mean[i] /= vecs.length;
+        protos[shape] = { vec: mean, count: vecs.length };
+      }
+      state.handshapePrototypes = protos;
+      const el = document.getElementById('handshapeProtoStatus');
+      if (el) {
+        const keys = HANDSHAPE_ORDER.filter(k => protos[k]);
+        if (keys.length >= 2) {
+          el.textContent = `🧠 AI 手形庫已啟用：已學會 ${keys.length}/6 種（${keys.map(formatHandshapeTag).join('、')}）→ 鏡頭與影片自動對應！`;
+          el.style.color = 'var(--sage)';
+        } else if (keys.length === 1) {
+          el.textContent = `🧠 已錄 ${formatHandshapeTag(keys[0])}（再多錄至少 1 種手形即可啟動自動對應！）`;
+          el.style.color = 'var(--warn)';
+        } else {
+          el.textContent = '🧠 尚未錄製手形範例（選「🖐️ 手形教學」各錄 1～2 秒即可教 AI 自動認出 6 種手形）';
+          el.style.color = 'var(--muted)';
+        }
+      }
+    }
+
     function classifyRealHandshape(lm) {
+      // 1. If the researcher taught >= 2 handshapes via 'word_handshape', match against HER prototypes first!
+      const protos = (typeof state !== 'undefined' && state?.handshapePrototypes) ? state.handshapePrototypes : null;
+      const protoKeys = protos ? Object.keys(protos) : [];
+      if (protoKeys.length >= 2) {
+        const feat = extractHandshapeFeat(lm);
+        if (feat) {
+          let bestShape = null, bestDist = Infinity;
+          for (const sh of protoKeys) {
+            const p = protos[sh].vec;
+            let s = 0;
+            for (let i = 0; i < feat.length; i++) { const d = feat[i] - p[i]; s += d * d; }
+            const dist = Math.sqrt(s);
+            if (dist < bestDist) { bestDist = dist; bestShape = sh; }
+          }
+          if (bestShape && bestDist < 1.15) return bestShape;
+        }
+      }
+
+      // 2. Built-in geometric fallback covering / C /, / 手 /, / 一 /, / 坤 /, / 同 /, / 果 /
       const palmLen = Math.max(0.05, dist3(lm[0], lm[9]));
       const fPairs = [[5,6,8],[9,10,12],[13,14,16],[17,18,20]];
       const curls = fPairs.map(([mcp, pip, tip]) => {
@@ -862,7 +946,6 @@
       if (avgCurl < 0.42 && spread < 0.28 && aperture > 0.28 && aperture < 0.65) return 'Bent C';
       if ((spread >= 0.30 && aperture >= 0.46) || (spread >= 0.38 && avgCurl >= 0.22)) return 'Bent 5';
       if (aperture >= 0.46 && spread < 0.32) return 'C';
-      if (aperture < 0.20) return 'Flat O';
       return 'Open O';
     }
 
@@ -870,13 +953,13 @@
     // CORE DATA & APP LOGIC (SHARED WITH STUDIO VERSION)
     // =========================================================================
     const HANDSHAPE_SPECS = {
+      'C':      { zh: 'C',  category: '圓柱形',       curl: [0.42,0.44,0.46,0.48], thumbCurl: 0.30, spread: 0.10, aperture: 0.58 },
       'Open B': { zh: '手', category: '平面／一般放', curl: [0.05,0.05,0.05,0.05], thumbCurl: 0.12, spread: 0.12, aperture: 0.18 },
-      'Open O': { zh: '果', category: '中小圓形', curl: [0.46,0.48,0.50,0.52], thumbCurl: 0.40, spread: 0.18, aperture: 0.36 },
-      'Bent 5': { zh: '同', category: '大圓球體', curl: [0.44,0.46,0.48,0.50], thumbCurl: 0.34, spread: 0.82, aperture: 0.72 },
-      'Bent C': { zh: '紳', category: '扁平四方形', curl: [0.16,0.16,0.18,0.20], thumbCurl: 0.18, spread: 0.08, aperture: 0.42, flatClamp: true },
-      'C':      { zh: '方', category: '圓柱體', curl: [0.42,0.44,0.46,0.48], thumbCurl: 0.30, spread: 0.10, aperture: 0.58 },
-      '1':      { zh: '一', category: '細長條狀', curl: [0.05,0.88,0.90,0.90], thumbCurl: 0.70, spread: 0.12, aperture: 0.22 },
-      'Flat O': { zh: '萬', category: '扁小捏持', curl: [0.22,0.22,0.24,0.26], thumbCurl: 0.24, spread: 0.06, aperture: 0.12 }
+      '1':      { zh: '一', category: '長條形',       curl: [0.05,0.88,0.90,0.90], thumbCurl: 0.70, spread: 0.12, aperture: 0.22 },
+      'Bent C': { zh: '坤', category: '厚四方／弧形', curl: [0.16,0.16,0.18,0.20], thumbCurl: 0.18, spread: 0.08, aperture: 0.42, flatClamp: true },
+      'Bent 5': { zh: '同', category: '較大／大型圓形', curl: [0.44,0.46,0.48,0.50], thumbCurl: 0.34, spread: 0.82, aperture: 0.72 },
+      'Open O': { zh: '果', category: '較小圓形',     curl: [0.46,0.48,0.50,0.52], thumbCurl: 0.40, spread: 0.18, aperture: 0.36 },
+      'Flat O': { zh: '坤', category: '扁小捏持',     curl: [0.22,0.22,0.24,0.26], thumbCurl: 0.24, spread: 0.06, aperture: 0.12 }
     };
 
     const DEFAULT_RULES = [
@@ -1451,8 +1534,8 @@
       } else {
         drawCompactHolisticBackdrop(ctx, W, H, frame.pose, frame.face);
       }
-      if (frame.nonDominant) drawHandSkeleton(ctx, frame.nonDominant.landmarks, W, H, '#32a890', `非主手 ${frame.nonDominant.handshape} (${frame.nonDominant.palm === 'down' ? '朝下' : '朝上'})`);
-      if (frame.dominant) drawHandSkeleton(ctx, frame.dominant.landmarks, W, H, '#f5b841', `主手 ${frame.dominant.handshape} (${frame.dominant.palm === 'up' ? '朝上' : '朝下'})`);
+      if (frame.nonDominant) drawHandSkeleton(ctx, frame.nonDominant.landmarks, W, H, '#32a890', `非主手 ${formatHandshapeTag(frame.nonDominant.handshape)} (${frame.nonDominant.palm === 'down' ? '朝下' : '朝上'})`);
+      if (frame.dominant) drawHandSkeleton(ctx, frame.dominant.landmarks, W, H, '#f5b841', `主手 ${formatHandshapeTag(frame.dominant.handshape)} (${frame.dominant.palm === 'up' ? '朝上' : '朝下'})`);
       if (note) { ctx.fillStyle = '#9aa6b2'; ctx.font = '12px sans-serif'; ctx.fillText(note, 26, H - 12); }
     }
 
@@ -1542,16 +1625,16 @@
               if (rawLabel === dhTarget) dh = obj; else ndh = obj;
             });
             const handCount = (dh ? 1 : 0) + (ndh ? 1 : 0);
-            if (ndh) drawHandSkeleton(ctx, ndh.landmarks, canvas.width, canvas.height, '#32a890', `非主手 ${ndh.handshape} (${ndh.palm === 'down' ? '朝下' : '朝上'})`);
-            if (dh) drawHandSkeleton(ctx, dh.landmarks, canvas.width, canvas.height, '#f5b841', `主手 ${dh.handshape} (${dh.palm === 'up' ? '朝上' : '朝下'})`);
+            if (ndh) drawHandSkeleton(ctx, ndh.landmarks, canvas.width, canvas.height, '#32a890', `非主手 ${formatHandshapeTag(ndh.handshape)} (${ndh.palm === 'down' ? '朝下' : '朝上'})`);
+            if (dh) drawHandSkeleton(ctx, dh.landmarks, canvas.width, canvas.height, '#f5b841', `主手 ${formatHandshapeTag(dh.handshape)} (${dh.palm === 'up' ? '朝上' : '朝下'})`);
             drawHolisticStatusPill(ctx, handCount, faceCount, poseCount);
 
             state.lastLiveFrame = {
               frameIndex: simTick, timestampMs: Math.round(nowTs), phase: 'live',
               handedness: state.handedness, dominant: dh, nonDominant: ndh, pose: poseSummary, face: faceSummary
             };
-            document.getElementById('liveDhReadout').textContent = dh ? `主手：${dh.handshape}（掌心${dh.palm === 'up' ? '朝上' : dh.palm === 'down' ? '朝下' : '朝側'}）` : '主手：未入鏡';
-            document.getElementById('liveNdhReadout').textContent = ndh ? `非主手：${ndh.handshape}（掌心${ndh.palm === 'down' ? '朝下' : ndh.palm === 'up' ? '朝上' : '朝側'}）` : '非主手：未入鏡';
+            document.getElementById('liveDhReadout').textContent = dh ? `主手：${formatHandshapeTag(dh.handshape)}（掌心${dh.palm === 'up' ? '朝上' : dh.palm === 'down' ? '朝下' : '朝側'}）` : '主手：未入鏡';
+            document.getElementById('liveNdhReadout').textContent = ndh ? `非主手：${formatHandshapeTag(ndh.handshape)}（掌心${ndh.palm === 'down' ? '朝下' : ndh.palm === 'up' ? '朝上' : '朝側'}）` : '非主手：未入鏡';
             document.getElementById('liveHolisticReadout').textContent = `臉部 ${faceCount} · 姿勢 ${poseCount}${faceSummary && faceSummary.browUp > 0.35 ? ' · 挑眉' : ''}`;
           }
         } else {
@@ -1559,8 +1642,8 @@
           const seq = synthesizeSequence({ objectId: objId }, 15, 2.5);
           const f = seq[Math.floor((simTick / 3) % seq.length)];
           renderLandmarkFrame(canvas, f, 'Holistic 553點 示範串流（切換「真實鏡頭」即啟動 MediaPipe 臉部＋姿勢＋雙手追蹤）');
-          document.getElementById('liveDhReadout').textContent = `主手：${f.dominant.handshape}（掌心${f.dominant.palm === 'up' ? '朝上' : '朝下'}）`;
-          document.getElementById('liveNdhReadout').textContent = f.nonDominant ? `非主手：${f.nonDominant.handshape}（掌心${f.nonDominant.palm === 'down' ? '朝下' : '朝上'}）` : '非主手：無';
+          document.getElementById('liveDhReadout').textContent = `主手：${formatHandshapeTag(f.dominant.handshape)}（掌心${f.dominant.palm === 'up' ? '朝上' : '朝下'}）`;
+          document.getElementById('liveNdhReadout').textContent = f.nonDominant ? `非主手：${formatHandshapeTag(f.nonDominant.handshape)}（掌心${f.nonDominant.palm === 'down' ? '朝下' : '朝上'}）` : '非主手：無';
           document.getElementById('liveHolisticReadout').textContent = '臉部 1 · 姿勢 1（示範）';
         }
       }
@@ -1621,7 +1704,11 @@
     function onClipTypeChange() {
       const ct = document.getElementById('recClipType')?.value || 'sentence';
       const obj = state.objects.find(o => o.id === document.getElementById('recObjectSelect')?.value) || state.objects[0];
-      if (ct === 'word_loc') {
+      if (ct === 'word_handshape') {
+        const sh = document.getElementById('recDhShape')?.value || 'C';
+        document.getElementById('recLabelInput').value = `手形：${formatHandshapeTag(sh)}`;
+        document.getElementById('recNdhMode').value = 'none';
+      } else if (ct === 'word_loc') {
         document.getElementById('recLabelInput').value = '桌子';
         document.getElementById('recDhShape').value = 'Open B';
         document.getElementById('recNdhMode').value = 'Open B_down';
@@ -1636,6 +1723,13 @@
       }
     }
 
+    function onRecDhShapeChange() {
+      if ((document.getElementById('recClipType')?.value || '') === 'word_handshape') {
+        const sh = document.getElementById('recDhShape')?.value || 'C';
+        document.getElementById('recLabelInput').value = `手形：${formatHandshapeTag(sh)}`;
+      }
+    }
+
     function startOverwriteSample(id) {
       const s = state.samples.find(x => x.id === id); if (!s) return;
       state.overwriteSampleId = id; state.editingSampleId = null;
@@ -1646,7 +1740,7 @@
         document.getElementById('simActionSelect').value = s.objectId;
       }
       document.getElementById('recSignerId').value = s.signerId || 'D01';
-      document.getElementById('recDhShape').value = s.dhShape || 'Open O';
+      document.getElementById('recDhShape').value = s.dhShape || 'C';
       document.getElementById('recNdhMode').value = s.ndhMode || 'Open B_down';
       document.getElementById('overwriteBanner').classList.remove('hidden');
       document.getElementById('overwriteTargetText').textContent = `「${s.label}」（語者 ${s.signerId || 'D01'}）`;
@@ -1669,6 +1763,9 @@
       const label = document.getElementById('recLabelInput').value.trim() || '未命名手語';
       const obj = state.objects.find(o => o.id === document.getElementById('recObjectSelect').value) || state.objects[0];
       const signerId = (document.getElementById('recSignerId')?.value || 'D01').trim() || 'D01';
+      const dhShape = document.getElementById('recDhShape').value;
+      const objectFeature = clipType === 'word_handshape' ? '手形教學示範' : (obj?.shapeDesc || '');
+      const classifierTag = clipType === 'word_handshape' ? formatHandshapeTag(dhShape) : (obj?.classifierTag || formatHandshapeTag(dhShape));
       const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
 
       if (state.overwriteSampleId) {
@@ -1676,7 +1773,8 @@
         if (idx !== -1) {
           const updated = {
             ...state.samples[idx], clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
-            dhShape: document.getElementById('recDhShape').value, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+            objectFeature, classifierTag,
+            dhShape, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
             handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
             frameCount: state.lastLandmarks.length, createdAt: `已重錄覆蓋 ${nowStr}`, frames: state.lastLandmarks
           };
@@ -1693,14 +1791,17 @@
 
       const smp = {
         id: 'smp_' + Date.now(), clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
-        dhShape: document.getElementById('recDhShape').value, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+        objectFeature, classifierTag,
+        dhShape, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
         handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
         frameCount: state.lastLandmarks.length, createdAt: nowStr, frames: state.lastLandmarks
       };
       state.samples.unshift(smp); await idbPut('samples', smp);
       renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
-      const typeLabel = clipType === 'word_noun' ? '單詞（名詞）' : (clipType === 'word_loc' ? '單詞（處所）' : '完整句子');
-      document.getElementById('recMessage').textContent = `✅ 已存入本機資料庫：「${label}」（${typeLabel} · 語者 ${signerId}）`;
+      const typeLabel = clipType === 'word_handshape' ? `🖐️ 手形教學 ${formatHandshapeTag(dhShape)}` : (clipType === 'word_noun' ? '單詞（名詞）' : (clipType === 'word_loc' ? '單詞（處所）' : '完整句子'));
+      document.getElementById('recMessage').textContent = clipType === 'word_handshape'
+        ? `✅ AI 已學習手形 ${formatHandshapeTag(dhShape)}！（語者 ${signerId} · ${state.lastLandmarks.length}f，現在鏡頭與影片即可自動辨識此手形！）`
+        : `✅ 已存入本機資料庫：「${label}」（${typeLabel} · 語者 ${signerId}）`;
       if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(smp, state.lastVideoBlob);
     }
 
@@ -1815,6 +1916,7 @@
     function sendSampleToRecognizer(id) { switchTab('recognize'); document.getElementById('recogDbSelect').value = id; runDbSampleRecognition(); }
 
     function renderSampleList() {
+      rebuildHandshapePrototypes();
       document.getElementById('sampleCountPill').textContent = `${state.samples.length} 筆`;
       document.getElementById('statSamples').textContent = state.samples.length;
       document.getElementById('statRules').textContent = state.rules.length;
@@ -1826,18 +1928,17 @@
         const tag = (s.classifierTag || obj?.classifierTag || '').toLowerCase();
         return (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q) || feat.includes(q) || tag.includes(q);
       }) : state.samples;
-      const shapeOpts = ['Open O','Bent 5','Open B','C','1','Bent C','Flat O'];
       document.getElementById('sampleListContainer').innerHTML = list.map(s => {
         const obj = state.objects.find(o => o.id === s.objectId);
         const r = state.rules.find(x => x.id === (s.ruleId || obj?.ruleId));
         const sid = s.signerId || 'D01';
         const feat = s.objectFeature || obj?.shapeDesc || '';
-        const clTag = s.classifierTag || obj?.classifierTag || s.dhShape;
+        const clTag = s.clipType === 'word_handshape' ? formatHandshapeTag(s.dhShape) : (s.classifierTag || obj?.classifierTag || formatHandshapeTag(s.dhShape));
         const isEd = state.editingSampleId === s.id, isOv = state.overwriteSampleId === s.id;
-        const typeBadge = s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (r ? r.code : '句子'));
+        const typeBadge = s.clipType === 'word_handshape' ? '🖐️ 手形教學' : (s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (r ? r.code : '句子')));
         return `<div class="subcard space-y-sm" style="${isOv ? 'border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);' : ''}">
           <div class="between">
-            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b>${feat ? ` · 特徵：${feat}` : ''} · 代形詞：<b>${clTag}</b> · ${s.frameCount}f</div></div>
+            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b>${feat ? ` · 特徵：${feat}` : ''} · 代形詞／手形：<b>${clTag}</b> · ${s.frameCount}f</div></div>
             <span class="pill">${typeBadge}</span>
           </div>
           ${isEd ? `<div class="card space-y-sm" style="padding:10px;">
@@ -1846,8 +1947,8 @@
               <div><label class="field-label">語者編號</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
             </div>
             <div class="grid-2">
-              <div><label class="field-label">關聯物件與代形詞</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || o.handshape}）</option>`).join('')}</select></div>
-              <div><label class="field-label">AI 幾何手形</label><select id="editShape_${s.id}">${shapeOpts.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${sh}</option>`).join('')}</select></div>
+              <div><label class="field-label">關聯物件與代形詞</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || formatHandshapeTag(o.handshape)}）</option>`).join('')}</select></div>
+              <div><label class="field-label">預期主手手形</label><select id="editShape_${s.id}">${HANDSHAPE_ORDER.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${formatHandshapeTag(sh)}</option>`).join('')}</select></div>
             </div>
             <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存修改</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
           </div>` : ''}
@@ -2719,7 +2820,7 @@
         clip_type: s.clipType || 'sentence',
         label: s.label || '',
         object_id: s.objectId || '',
-        rule_code: rule ? rule.code : (s.clipType === 'word_noun' ? '單詞名詞' : (s.clipType === 'word_loc' ? '單詞處所' : '自訂')),
+        rule_code: s.clipType === 'word_handshape' ? '手形教學' : (s.clipType === 'word_noun' ? '單詞名詞' : (s.clipType === 'word_loc' ? '單詞處所' : (rule ? rule.code : '自訂'))),
         dh_shape: s.dhShape || '',
         dh_palm: s.dhPalm || 'up',
         ndh_mode: s.ndhMode || '',
