@@ -330,7 +330,7 @@
             <div class="row" style="gap:6px;">
               <button class="btn btn-sm" onclick="syncUploadAllToGs()">⬆️ 上傳全部</button>
               <button class="btn btn-sm btn-primary" onclick="syncPullFromGs()">⬇️ 同步下載</button>
-              <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製受試者專屬連結（自動隱藏後台設定、禁止下載他人語料）">🔒 複製受試者連結</button>
+              <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製獨立乾淨的受試者錄製頁 (record.html) 專屬連結，對方看不到任何後台設定">🔒 複製受試者連結</button>
             </div>
           </div>
           <div id="gsSyncMessage" class="muted" style="font-size:11px;">綁定後，錄影存檔或上傳影片會自動寫入 Google 試算表，並將影片存進你 Google 硬碟的「TSL_PUT_影片語料庫」。</div>
@@ -394,20 +394,22 @@
 
         <div id="newObjectForm" class="subcard hidden space-y-sm">
           <div class="grid-3">
-            <div><label class="field-label">物件名詞</label><input id="objName" type="text" placeholder="如：橘子、手機" /></div>
-            <div><label class="field-label">外形特徵</label><input id="objShapeDesc" type="text" placeholder="如：小圓形、扁平長方" /></div>
+            <div><label class="field-label">物體名詞</label><input id="objName" type="text" placeholder="如：鳳梨、報紙、雨傘" /></div>
+            <div><label class="field-label">物體特徵</label><input id="objShapeDesc" type="text" placeholder="如：圓柱形、平面 / 扁平物、長條形" /></div>
+            <div><label class="field-label">代形詞標記（依標準規則）</label><input id="objClassifierTag" type="text" placeholder="如：/ C /、/ 手 /、/ 一 /、依大小調整" /></div>
+            <div><label class="field-label">語意重點</label><input id="objSemanticFocus" type="text" placeholder="如：呈現杯子的圓柱輪廓" /></div>
             <div><label class="field-label">適用規則</label><select id="objRuleId"></select></div>
-            <div><label class="field-label">原詞彙手語構成</label><input id="objLexicalGloss" type="text" placeholder="如：黃+水果" /></div>
+            <div><label class="field-label">原詞彙手語構成</label><input id="objLexicalGloss" type="text" placeholder="如：紅＋水果、書本" /></div>
             <div>
-              <label class="field-label">主手手形</label>
+              <label class="field-label">AI 幾何手形（追蹤用）</label>
               <select id="objHandshape">
-                <option value="Open O">Open O (果)</option>
-                <option value="Bent 5">Bent 5 (同)</option>
-                <option value="Bent C">Bent C (紳)</option>
-                <option value="C">C (方)</option>
-                <option value="1">1 (一)</option>
-                <option value="Flat O">Flat O (萬)</option>
-                <option value="Open B">Open B (手) - 一般放</option>
+                <option value="Open O">Open O（較小圓形 / 果）</option>
+                <option value="Bent 5">Bent 5（較大立體或大型圓形 / 同）</option>
+                <option value="C">C（/ C / 圓柱形）</option>
+                <option value="Open B">Open B（/ 手 / 平面或一般放）</option>
+                <option value="1">1（/ 一 / 長條形）</option>
+                <option value="Bent C">Bent C（厚四方形 / 紳）</option>
+                <option value="Flat O">Flat O（扁小捏持 / 萬）</option>
               </select>
             </div>
             <div>
@@ -424,7 +426,7 @@
         <div style="overflow-x:auto;">
           <table>
             <thead>
-              <tr><th>物件</th><th>外形與詞彙</th><th>規則</th><th>主手手形／掌心</th><th style="text-align:right;">操作</th></tr>
+              <tr><th>物體</th><th>物體特徵</th><th>代形詞</th><th>語意重點</th><th>規則／幾何追蹤</th><th style="text-align:right;">操作</th></tr>
             </thead>
             <tbody id="objectTableBody"></tbody>
           </table>
@@ -879,17 +881,20 @@
 
     const DEFAULT_RULES = [
       { id: 'rule_1', code: '規則一', name: '獨立使用一般詞彙「放」', condition: '物件無固定外形（衣服、毛巾等）', coMode: 'lexical_put', desc: '使用一般詞彙 8-084 放：雙手平掌掌心朝上，主手由上往下疊放於非主手掌心。' },
-      { id: 'rule_2', code: '規則二', name: '直接套用前者詞彙手式（共構）', condition: '原詞彙末尾手形可直接代表外形（蘋果＝紅＋水果 Open O）', coMode: 'simultaneous_down', desc: '非主手保持 Open B 掌心朝下（桌子），主手沿用前詞手形（Open O 掌心朝上）向下放置。' },
-      { id: 'rule_3', code: '規則三', name: '依事物外形選用代形詞（共構）', condition: '原詞無可直接沿用手形，依外形大小切換（西瓜 Bent 5、書 Bent C、杯子 C、筆 1）', coMode: 'simultaneous_down', desc: '非主手保持 Open B 掌心朝下（桌子），主手依外形切換代形詞掌心朝上向下放置。' }
+      { id: 'rule_2', code: '規則二', name: '直接套用前者詞彙手式（共構）', condition: '原詞彙末尾手形可直接代表外形（如蘋果＝紅＋水果，依大小調整）', coMode: 'simultaneous_down', desc: '非主手保持 / 手 / 掌心朝下（桌子），主手沿用前詞手形並依大小調整向下放置。' },
+      { id: 'rule_3', code: '規則三', name: '依物體特徵選用代形詞（共構）', condition: '依物體特徵切換標準代形詞：圓柱形 / C /、平面 / 手 /、長條形 / 一 /、水果類依大小調整', coMode: 'simultaneous_down', desc: '非主手保持 / 手 / 掌心朝下（桌子），主手依物體特徵選用對應代形詞向下放置於桌面上。' }
     ];
 
     const DEFAULT_OBJECTS = [
-      { id: 'obj_apple', name: '蘋果', shapeDesc: '中小圓形', lexicalGloss: '紅＋水果 (Open O)', ruleId: 'rule_2', handshape: 'Open O', palm: 'up', ndhMode: 'Open B_down', note: '沿用水果手式 Open O 掌心朝上，放於非主手 Open B 上' },
-      { id: 'obj_watermelon', name: '西瓜', shapeDesc: '大圓球形', lexicalGloss: '西瓜（無現成手式）', ruleId: 'rule_3', handshape: 'Bent 5', palm: 'up', ndhMode: 'Open B_down', note: '外形比蘋果大，改用張開的 Bent 5 掌心朝上，放於非主手 Open B 上' },
-      { id: 'obj_book', name: '書', shapeDesc: '四方形', lexicalGloss: '書本', ruleId: 'rule_3', handshape: 'Bent C', palm: 'up', ndhMode: 'Open B_down', note: '比完書本後切換四方手式 Bent C 掌心朝上，放於非主手 Open B 上' },
-      { id: 'obj_clothes', name: '衣服', shapeDesc: '無固定形狀', lexicalGloss: '衣服＋獨立放 (8-084)', ruleId: 'rule_1', handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '無固定外形，使用一般詞彙 8-084 放（雙手掌心朝上疊放）' },
-      { id: 'obj_cup', name: '杯子', shapeDesc: '圓柱形', lexicalGloss: '杯子', ruleId: 'rule_3', handshape: 'C', palm: 'up', ndhMode: 'Open B_down', note: '依圓柱外形選用 C 放於非主手 Open B 上' },
-      { id: 'obj_pen', name: '筆', shapeDesc: '細長條狀', lexicalGloss: '筆', ruleId: 'rule_3', handshape: '1', palm: 'up', ndhMode: 'Open B_down', note: '依細長外形選用 1 放於非主手 Open B 上' }
+      { id: 'obj_apple', name: '蘋果', shapeDesc: '較小圓形物', classifierTag: '依大小調整', semanticFocus: '表示較小的圓形水果', lexicalGloss: '紅＋水果', ruleId: 'rule_2', handshape: 'Open O', palm: 'up', ndhMode: 'Open B_down', note: '較小圓形物，代形詞依大小調整，表示較小的圓形水果' },
+      { id: 'obj_watermelon', name: '西瓜', shapeDesc: '大型圓形物', classifierTag: '依大小調整', semanticFocus: '表示更大的圓形水果', lexicalGloss: '西瓜', ruleId: 'rule_3', handshape: 'Bent 5', palm: 'up', ndhMode: 'Open B_down', note: '大型圓形物，代形詞依大小調整，表示更大的圓形水果' },
+      { id: 'obj_clothes', name: '衣服', shapeDesc: '無固定形狀', classifierTag: '一般放 (8-084)', semanticFocus: '無固定外形，使用一般詞彙放（雙手掌心朝上疊放）', lexicalGloss: '衣服＋獨立放 (8-084)', ruleId: 'rule_1', handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '無固定外形，使用一般詞彙 8-084 放（雙手掌心朝上疊放）' },
+      { id: 'obj_cup', name: '杯子', shapeDesc: '圓柱形', classifierTag: '/ C /', semanticFocus: '呈現杯子的圓柱輪廓', lexicalGloss: '杯子', ruleId: 'rule_3', handshape: 'C', palm: 'up', ndhMode: 'Open B_down', note: '圓柱形，代形詞 / C /，呈現杯子的圓柱輪廓' },
+      { id: 'obj_pen', name: '筆', shapeDesc: '長條形', classifierTag: '/ 一 / 或保留筆的打法', semanticFocus: '表示細長物，或直接呈現筆', lexicalGloss: '筆', ruleId: 'rule_3', handshape: '1', palm: 'up', ndhMode: 'Open B_down', note: '長條形，代形詞 / 一 / 或保留筆的打法，表示細長物或直接呈現筆' },
+      { id: 'obj_book', name: '書', shapeDesc: '平面 / 扁平物', classifierTag: '/ 手 /', semanticFocus: '表示書作為平面物放在桌上', lexicalGloss: '書本', ruleId: 'rule_3', handshape: 'Open B', palm: 'down', ndhMode: 'Open B_down', note: '平面 / 扁平物，代形詞 / 手 /，表示書作為平面物放在桌上' },
+      { id: 'obj_pineapple', name: '鳳梨', shapeDesc: '較大的立體水果', classifierTag: '依大小調整', semanticFocus: '表示較大的水果體積', lexicalGloss: '鳳梨', ruleId: 'rule_3', handshape: 'Bent 5', palm: 'up', ndhMode: 'Open B_down', note: '較大的立體水果，代形詞依大小調整，表示較大的水果體積' },
+      { id: 'obj_newspaper', name: '報紙', shapeDesc: '平面 / 薄片狀', classifierTag: '/ 手 /', semanticFocus: '表示報紙攤放或放置在桌上', lexicalGloss: '報紙', ruleId: 'rule_3', handshape: 'Open B', palm: 'down', ndhMode: 'Open B_down', note: '平面 / 薄片狀，代形詞 / 手 /，表示報紙攤放或放置在桌上' },
+      { id: 'obj_umbrella', name: '雨傘', shapeDesc: '長條形', classifierTag: '/ 一 /', semanticFocus: '表示長條物放在桌面上', lexicalGloss: '雨傘', ruleId: 'rule_3', handshape: '1', palm: 'up', ndhMode: 'Open B_down', note: '長條形，代形詞 / 一 /，表示長條物放在桌面上' }
     ];
 
     let state = {
@@ -1118,8 +1123,9 @@
         nearNdh = hx < hxLim && vy >= -0.075 && vy <= vyLim;
       }
 
-      // Recognize both simultaneous classifier PUT (allowing palm up/in/dome for Bent 5, C, 1, Bent C) and lexical 8-084 PUT
+      // Recognize simultaneous classifier PUT (Bent 5, C, 1, Open O, or flat / 手 / Open B with downward drop) and lexical 8-084 PUT
       const isLexicalStack = (ndhPalm === 'up' && dhPalm === 'up' && dhShape === 'Open B' && nearNdh && hx < 0.145 * (1 + tol.contactRatio));
+      const isFlatPlanePut = (dhShape === 'Open B' && ndhPalm === 'down' && nearNdh && hx < 0.135 * (1 + tol.contactRatio) && peakDropDy >= tol.dyMin);
       const effectiveDyMin = isLexicalStack
         ? Math.max(0.03, tol.dyMin * 0.45)
         : (isClassifierShape && nearNdh && hasHold ? Math.max(0.045, tol.dyMin * 0.68) : tol.dyMin);
@@ -1127,7 +1133,7 @@
 
       let trajScore = (hasDownward ? 45 : (isLexicalStack && nearNdh ? 35 : 0)) + (hasHold ? 25 : 0) + (nearNdh ? 30 : 0);
       const minHold = Math.max(45, Math.round(68 - tol.contactRatio * 40));
-      const validDhPalm = isClassifierShape ? true : (dhPalm === 'up' || (dhPalm === 'in' && ndhPalm === 'down'));
+      const validDhPalm = isClassifierShape ? true : (dhPalm === 'up' || (dhPalm === 'in' && ndhPalm === 'down') || isFlatPlanePut);
       const isPut = (ndhWin.length >= 2) && (ndhHoldScore >= minHold) && nearNdh && (trajScore >= 75 || (isLexicalStack && hasHold)) && validDhPalm;
 
       trace.push(isPut
@@ -1170,20 +1176,21 @@
       if (isPut) {
         if (ndhPalm === 'up' && dhShape === 'Open B') {
           matchedRule = state.rules.find(r => r.coMode === 'lexical_put') || state.rules[0];
-          if (!matchedObj) matchedObj = state.objects.find(o => o.ruleId === matchedRule.id) || ctxObj || state.objects[3];
+          if (!matchedObj) matchedObj = state.objects.find(o => o.ruleId === matchedRule.id) || ctxObj || state.objects[2];
         } else {
-          if (!matchedObj) matchedObj = state.objects.find(o => o.handshape === dhShape && o.ndhMode === 'Open B_down') || ctxObj;
           if (!matchedObj && dhShape === 'Open B' && ndhPalm === 'down') {
             const preShapes = valid.slice(0, Math.max(4, bestIdx)).map(f => f.dominant.handshape).filter(sh => sh && sh !== 'Open B');
             const preShape = majorityVote(preShapes, null);
             if (preShape) matchedObj = state.objects.find(o => o.handshape === preShape && o.ndhMode === 'Open B_down') || null;
           }
+          if (!matchedObj) matchedObj = state.objects.find(o => o.handshape === dhShape && o.ndhMode === 'Open B_down') || ctxObj;
           matchedRule = matchedObj ? (state.rules.find(r => r.id === matchedObj.ruleId) || state.rules[2]) : state.rules[2];
         }
         ruleScore = 95;
         const nounName = blindNoun ? blindNoun.word : (matchedObj ? matchedObj.name : spec.category);
         sentence = `${nounName}放在${locName}上`;
-        trace.push(`④ 規則驗證：命中【${matchedRule.code}：${matchedRule.name}】→ 輸出句子：「${sentence}」`);
+        const clInfo = matchedObj ? `（特徵：${matchedObj.shapeDesc || ''} · 代形詞：${matchedObj.classifierTag || dhShape}）` : '';
+        trace.push(`④ 規則驗證：命中【${matchedRule.code}：${matchedRule.name}】${clInfo} → 輸出句子：「${sentence}」`);
       } else {
         const nounName = blindNoun ? blindNoun.word : (ctxObj ? ctxObj.name : dhShape);
         sentence = `非「放」動作（僅偵測到 ${nounName}）`;
@@ -1196,9 +1203,9 @@
       return {
         isPut, sentence, ndhHoldScore,
         ndhSummary: ndhWin.length >= 2 ? `${ndhShape} · 掌心${ndhPalm === 'down' ? '朝下(桌子)' : ndhPalm === 'up' ? '朝上(一般放)' : '朝側'}` : '無非主手參照',
-        dhShape, dhSummary: `${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
+        dhShape, dhSummary: `${matchedObj?.classifierTag ? `${matchedObj.classifierTag} · ` : ''}${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
         shapeScore: 92, trajScore, trajSummary: isPut ? `掌心重疊接觸 · 向下 Δy=+${peakDropDy.toFixed(2)}` : `Δy=${peakDropDy.toFixed(2)} · 掌心距 ${hx.toFixed(2)}`,
-        ruleScore, ruleSummary: matchedRule ? `${matchedRule.code}：${matchedRule.name}` : '未觸發放規則', matchedRule, trace
+        ruleScore, ruleSummary: matchedRule ? `${matchedRule.code}：${matchedRule.name}` : '未觸發放規則', matchedRule, matchedObj, trace
       };
     }
 
@@ -1742,7 +1749,16 @@
       const newShape = document.getElementById(`editShape_${id}`)?.value || state.samples[idx].dhShape;
       const newObjId = document.getElementById(`editObj_${id}`)?.value || state.samples[idx].objectId;
       const obj = state.objects.find(o => o.id === newObjId);
-      const updated = { ...state.samples[idx], label: newLabel, signerId: newSigner, dhShape: newShape, objectId: newObjId, ruleId: obj ? obj.ruleId : state.samples[idx].ruleId };
+      const updated = {
+        ...state.samples[idx],
+        label: newLabel,
+        signerId: newSigner,
+        dhShape: newShape,
+        objectId: newObjId,
+        objectFeature: obj ? obj.shapeDesc : (state.samples[idx].objectFeature || ''),
+        classifierTag: obj ? obj.classifierTag : (state.samples[idx].classifierTag || ''),
+        ruleId: obj ? obj.ruleId : state.samples[idx].ruleId
+      };
       state.samples[idx] = updated; await idbPut('samples', updated);
       state.editingSampleId = null; renderSampleList(); refreshRecognizerSelects();
       document.getElementById('recMessage').textContent = `✅ 已更新「${newLabel}」（語者 ${newSigner}）`;
@@ -1804,16 +1820,24 @@
       document.getElementById('statRules').textContent = state.rules.length;
       document.getElementById('statObjects').textContent = state.objects.length;
       const q = (document.getElementById('sampleSearchInput')?.value || '').trim().toLowerCase();
-      const list = q ? state.samples.filter(s => (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q)) : state.samples;
-      const shapeOpts = ['Open O','Bent 5','Bent C','Open B','C','1','Flat O'];
+      const list = q ? state.samples.filter(s => {
+        const obj = state.objects.find(o => o.id === s.objectId);
+        const feat = (s.objectFeature || obj?.shapeDesc || '').toLowerCase();
+        const tag = (s.classifierTag || obj?.classifierTag || '').toLowerCase();
+        return (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q) || feat.includes(q) || tag.includes(q);
+      }) : state.samples;
+      const shapeOpts = ['Open O','Bent 5','Open B','C','1','Bent C','Flat O'];
       document.getElementById('sampleListContainer').innerHTML = list.map(s => {
-        const r = state.rules.find(x => x.id === s.ruleId);
+        const obj = state.objects.find(o => o.id === s.objectId);
+        const r = state.rules.find(x => x.id === (s.ruleId || obj?.ruleId));
         const sid = s.signerId || 'D01';
+        const feat = s.objectFeature || obj?.shapeDesc || '';
+        const clTag = s.classifierTag || obj?.classifierTag || s.dhShape;
         const isEd = state.editingSampleId === s.id, isOv = state.overwriteSampleId === s.id;
         const typeBadge = s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (r ? r.code : '句子'));
         return `<div class="subcard space-y-sm" style="${isOv ? 'border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);' : ''}">
           <div class="between">
-            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b> · 主手 ${s.dhShape} · ${s.frameCount}f</div></div>
+            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b>${feat ? ` · 特徵：${feat}` : ''} · 代形詞：<b>${clTag}</b> · ${s.frameCount}f</div></div>
             <span class="pill">${typeBadge}</span>
           </div>
           ${isEd ? `<div class="card space-y-sm" style="padding:10px;">
@@ -1822,8 +1846,8 @@
               <div><label class="field-label">語者編號</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
             </div>
             <div class="grid-2">
-              <div><label class="field-label">關聯物件</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}</option>`).join('')}</select></div>
-              <div><label class="field-label">主手手形</label><select id="editShape_${s.id}">${shapeOpts.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${sh}</option>`).join('')}</select></div>
+              <div><label class="field-label">關聯物件與代形詞</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || o.handshape}）</option>`).join('')}</select></div>
+              <div><label class="field-label">AI 幾何手形</label><select id="editShape_${s.id}">${shapeOpts.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${sh}</option>`).join('')}</select></div>
             </div>
             <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存修改</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
           </div>` : ''}
@@ -1849,7 +1873,10 @@
     async function addNewObject() {
       const name = document.getElementById('objName').value.trim(); if (!name) return;
       const ruleId = document.getElementById('objRuleId').value, rule = state.rules.find(r => r.id === ruleId);
-      const o = { id: 'obj_' + Date.now(), name, shapeDesc: document.getElementById('objShapeDesc').value.trim() || '自訂外形', lexicalGloss: document.getElementById('objLexicalGloss').value.trim() || name, ruleId, handshape: document.getElementById('objHandshape').value, palm: document.getElementById('objPalm').value, ndhMode: rule?.coMode === 'lexical_put' ? 'Open B_up' : 'Open B_down', note: `依 ${rule?.code||'規則'} 選用` };
+      const handshape = document.getElementById('objHandshape').value;
+      const classifierTag = document.getElementById('objClassifierTag')?.value.trim() || (rule?.coMode === 'lexical_put' ? '一般放 (8-084)' : `/ ${HANDSHAPE_SPECS[handshape]?.zh || handshape} /`);
+      const semanticFocus = document.getElementById('objSemanticFocus')?.value.trim() || `依 ${rule?.code||'規則'} 選用`;
+      const o = { id: 'obj_' + Date.now(), name, shapeDesc: document.getElementById('objShapeDesc').value.trim() || '自訂物體特徵', classifierTag, semanticFocus, lexicalGloss: document.getElementById('objLexicalGloss').value.trim() || name, ruleId, handshape, palm: document.getElementById('objPalm').value, ndhMode: rule?.coMode === 'lexical_put' ? 'Open B_up' : 'Open B_down', note: semanticFocus };
       state.objects.push(o); await persistConfig();
       const smp = { id: 'smp_' + o.id, label: `${o.name}放在桌子上`, objectId: o.id, ruleId: o.ruleId, dhShape: o.handshape, dhPalm: o.palm, ndhMode: o.ndhMode, frameCount: 38, createdAt: '自動建立', frames: synthesizeSequence({ objectId: o.id }, 15, 2.5) };
       state.samples.unshift(smp); await idbPut('samples', smp); toggleNewObjectForm(); renderAll();
@@ -1861,7 +1888,9 @@
       document.getElementById('objRuleId').innerHTML = state.rules.map(r => `<option value="${r.id}">${r.code}：${r.name}</option>`).join('');
       document.getElementById('objectTableBody').innerHTML = state.objects.map(o => {
         const r = state.rules.find(x => x.id === o.ruleId);
-        return `<tr><td><b>${o.name}</b></td><td>${o.shapeDesc}<div class="muted">${o.lexicalGloss}</div></td><td><span class="pill">${r?r.code:''}</span></td><td><b>${o.handshape}</b> · 掌心${o.palm==='up'?'朝上':'朝下'}</td><td style="text-align:right;"><button class="btn btn-sm" onclick="previewObjectInAvatar('${o.name}')">卡通示範</button> <button class="btn btn-sm" onclick="deleteObject('${o.id}')">刪除</button></td></tr>`;
+        const clTag = o.classifierTag || `/ ${o.handshape} /`;
+        const focus = o.semanticFocus || o.note || '';
+        return `<tr><td><b>${o.name}</b></td><td>${o.shapeDesc || ''}</td><td><span class="pill" style="color:var(--primary);font-weight:700;">${clTag}</span></td><td style="font-size:12px;">${focus}</td><td><span class="pill">${r?r.code:''}</span><div class="muted" style="font-size:11px;margin-top:2px;">${o.handshape} · 掌心${o.palm==='up'?'朝上':'朝下'}</div></td><td style="text-align:right;"><button class="btn btn-sm" onclick="previewObjectInAvatar('${o.name}')">卡通示範</button> <button class="btn btn-sm" onclick="deleteObject('${o.id}')">刪除</button></td></tr>`;
       }).join('');
     }
 
@@ -1913,14 +1942,15 @@
     // AVATAR TAB
     function parseSentenceToPlan(text) {
       const t = text.trim() || '蘋果放在桌子上';
-      let obj = [...state.objects].sort((a,b) => b.name.length - a.name.length).find(o => t.includes(o.name)) || { name: '物品', shapeDesc: '未登錄', lexicalGloss: '物件＋一般放', ruleId: state.rules[0].id, handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '預設使用一般詞彙放' };
+      let obj = [...state.objects].sort((a,b) => b.name.length - a.name.length).find(o => t.includes(o.name)) || { name: '物品', shapeDesc: '未登錄', classifierTag: '一般放 (8-084)', semanticFocus: '預設使用一般詞彙放', lexicalGloss: '物件＋一般放', ruleId: state.rules[0].id, handshape: 'Open B', palm: 'up', ndhMode: 'Open B_up', note: '預設使用一般詞彙放' };
       const rule = state.rules.find(r => r.id === obj.ruleId) || state.rules[0], isLex = rule.coMode === 'lexical_put';
+      const clTag = obj.classifierTag || obj.handshape;
       return {
         sentence: t, object: obj, rule, isLexical: isLex, dhShape: obj.handshape, dhPalm: obj.palm, ndhShape: 'Open B', ndhPalm: isLex ? 'up' : 'down',
         steps: [
-          { idx: 0, range: [0, 0.32], title: `步驟 1：比出物件「${obj.name}」`, gloss: `${obj.lexicalGloss} → 準備 ${obj.handshape}`, detail: `先比出物件「${obj.name}」（${obj.shapeDesc}）。` },
-          { idx: 1, range: [0.32, 0.62], title: '步驟 2：比「桌子」並定格非主手參照面', gloss: isLex ? '桌子 [準備一般詞彙放]' : '桌子 [NDH: Open B 掌心朝下]', detail: isLex ? '比出「桌子」，準備接續一般獨立詞彙「放 (8-084)」。' : '非主手比出桌子代形詞 Open B（掌心朝下）定格為支撐平面。' },
-          { idx: 2, range: [0.62, 1], title: isLex ? '步驟 3：一般詞彙「放 (8-084)」' : `步驟 3：共構「放」(${obj.handshape} ↓ Open B)`, gloss: isLex ? '雙手 Open B 掌心朝上疊放' : `DH ${obj.handshape} 朝上 ↓ NDH Open B 朝下`, detail: obj.note }
+          { idx: 0, range: [0, 0.32], title: `步驟 1：比出物件「${obj.name}」`, gloss: `${obj.lexicalGloss} → 代形詞：${clTag}`, detail: `物體特徵：${obj.shapeDesc}。${obj.semanticFocus || ''}` },
+          { idx: 1, range: [0.32, 0.62], title: '步驟 2：比「桌子」並定格非主手參照面', gloss: isLex ? '桌子 [準備一般詞彙放]' : '桌子 [NDH: / 手 / 掌心朝下]', detail: isLex ? '比出「桌子」，準備接續一般獨立詞彙「放 (8-084)」。' : '非主手比出桌子代形詞 / 手 /（掌心朝下）定格為支撐平面。' },
+          { idx: 2, range: [0.62, 1], title: isLex ? '步驟 3：一般詞彙「放 (8-084)」' : `步驟 3：共構「放」(${clTag} ↓ / 手 /) `, gloss: isLex ? '雙手 Open B 掌心朝上疊放' : `DH ${clTag} (${obj.handshape}) ↓ NDH / 手 / 朝下`, detail: obj.semanticFocus || obj.note }
         ]
       };
     }
@@ -1928,15 +1958,16 @@
     function generateAvatarSign() { state.avatarPlan = parseSentenceToPlan(document.getElementById('avatarSentenceInput').value); state.avatarProgress = 0; state.avatarPlaying = true; renderAvatarSidePanel(); }
     function renderAvatarSidePanel() {
       const p = state.avatarPlan; if (!p) return;
-      document.getElementById('avatarRuleSummary').innerHTML = `<div class="between"><b>${p.sentence}</b><span class="pill" style="color:var(--primary);">${p.rule.code}</span></div><div class="muted">${p.rule.name} · ${p.object.shapeDesc}</div>`;
+      const clTag = p.object.classifierTag || p.dhShape;
+      document.getElementById('avatarRuleSummary').innerHTML = `<div class="between"><b>${p.sentence}</b><span class="pill" style="color:var(--primary);">${p.rule.code} · ${clTag}</span></div><div class="muted">物體特徵：${p.object.shapeDesc} · ${p.object.semanticFocus || p.rule.name}</div>`;
       document.getElementById('avatarStepCards').innerHTML = p.steps.map(s => `<div id="avatarStepCard_${s.idx}" class="subcard step-card" onclick="lockAvatarPhase(${s.idx})"><div style="font-weight:700;font-size:13px;">${s.title}</div><div style="font-family:monospace;font-size:11px;color:var(--primary);">${s.gloss}</div><div class="muted">${s.detail}</div></div>`).join('');
       const dhS = state.handedness === 'right' ? '右手' : '左手', ndhS = state.handedness === 'right' ? '左手' : '右手';
       document.getElementById('specNdhTitle').textContent = `非主手（${ndhS}）`;
-      document.getElementById('specNdhShape').textContent = `${p.ndhShape} (手)`;
+      document.getElementById('specNdhShape').textContent = `/ 手 / (${p.ndhShape})`;
       document.getElementById('specNdhDetail').textContent = p.isLexical ? '掌心朝上 (8-084)' : '掌心朝下 · 桌子參照面';
       document.getElementById('specDhTitle').textContent = `主手（${dhS}）`;
-      document.getElementById('specDhShape').textContent = `${p.dhShape} (${HANDSHAPE_SPECS[p.dhShape]?.zh||''})`;
-      document.getElementById('specDhDetail').textContent = `掌心${p.dhPalm==='up'?'朝上':'朝下'}`;
+      document.getElementById('specDhShape').textContent = `${clTag}`;
+      document.getElementById('specDhDetail').textContent = `${p.dhShape} · 掌心${p.dhPalm==='up'?'朝上':'朝下'}`;
     }
     function lockAvatarPhase(i) { state.avatarPlaying = false; const r = state.avatarPlan.steps[i].range; state.avatarProgress = r[0] + (r[1]-r[0])*0.78; document.getElementById('btnAvatarPlayPause').textContent = '▶ 繼續'; }
     function toggleAvatarPlay() { state.avatarPlaying = !state.avatarPlaying; document.getElementById('btnAvatarPlayPause').textContent = state.avatarPlaying ? '⏸ 暫停' : '▶ 播放'; }
@@ -2446,13 +2477,12 @@
     }
 
     const SHAPE_ONTOLOGY = [
-      { keywords: ['衣','褲','被','巾','毯','襪','布','圍巾','枕頭','毛衣','外套','袋','床單'], ruleIdx: 0, handshape: 'Open B', palm: 'up', shapeDesc: '柔軟／無固定幾何外形', reason: '屬於柔軟可變形物體，無固定外形，依規則一使用獨立詞彙「放 (8-084)」（雙手掌心朝上疊放）。', conf: 94 },
-      { keywords: ['果','橘','橙','桃','蛋','梨','番茄','檸檬','洋蔥','棒球','網球','蘋果','李子'], ruleIdx: 1, handshape: 'Open O', palm: 'up', shapeDesc: '中小圓球形', reason: '中小圓形物體，依規則二／三選用 Open O（掌心朝上）放於非主手 Open B 上。', conf: 91 },
-      { keywords: ['西瓜','籃球','足球','排球','哈密瓜','柚子','南瓜','鍋','碗','安全帽','頭盔','地球儀','盆'], ruleIdx: 2, handshape: 'Bent 5', palm: 'up', shapeDesc: '大圓球體／大口徑圓物', reason: '體積明顯大於蘋果，依規則三改用更張開的 Bent 5（掌心朝上）共構放置。', conf: 93 },
-      { keywords: ['書','本','手機','平板','筆電','電腦','字典','盒','箱','磚','盤','菜單','相框','筆記'], ruleIdx: 2, handshape: 'Bent C', palm: 'up', shapeDesc: '扁平四方形／板狀物', reason: '具有明顯扁平四方外形，依規則三切換為 Bent C（掌心朝上）放置。', conf: 92 },
-      { keywords: ['杯','瓶','壺','罐','桶','保溫','水壺','馬克杯','酒瓶','飲料','茶杯'], ruleIdx: 2, handshape: 'C', palm: 'up', shapeDesc: '圓柱形容器', reason: '直立圓柱外形，依規則三選用 C 手式共構放置。', conf: 93 },
-      { keywords: ['筆','筷','尺','棒','傘','牙刷','湯匙','叉子','吸管','遙控器','笛'], ruleIdx: 2, handshape: '1', palm: 'up', shapeDesc: '細長條狀物', reason: '細長線性外形，依規則三選用 1（細長代形詞）放置。', conf: 90 },
-      { keywords: ['紙','卡','票','信','照片','鑰匙','硬幣','名片','悠遊卡','鈔票'], ruleIdx: 2, handshape: 'Flat O', palm: 'up', shapeDesc: '極薄片狀／扁小物件', reason: '極薄片狀物件，依規則三建議採用 Flat O (萬) 扁小捏持代形詞。', conf: 89 }
+      { keywords: ['衣','褲','被','巾','毯','襪','布','圍巾','枕頭','毛衣','外套','袋','床單'], ruleIdx: 0, handshape: 'Open B', palm: 'up', shapeDesc: '無固定形狀', reason: '無固定外形，依規則一使用一般詞彙「放 (8-084)」（雙手掌心朝上疊放）。', conf: 94 },
+      { keywords: ['蘋果','橘','橙','桃','蛋','番茄','檸檬','洋蔥','棒球','網球','李子'], ruleIdx: 1, handshape: 'Open O', palm: 'up', shapeDesc: '較小圓形物', reason: '較小圓形水果，代形詞「依大小調整」，放於非主手 / 手 /（桌子）上。', conf: 92 },
+      { keywords: ['鳳梨','西瓜','哈密瓜','柚子','南瓜','籃球','足球','排球','鍋','碗','安全帽','頭盔','地球儀','盆'], ruleIdx: 2, handshape: 'Bent 5', palm: 'up', shapeDesc: '較大立體／大型圓形物', reason: '較大立體水果或大型圓形物，代形詞「依大小調整」，放於非主手 / 手 / 上。', conf: 93 },
+      { keywords: ['書','報紙','本','紙','手機','平板','筆電','電腦','字典','菜單','相框','筆記','卡','信','照片'], ruleIdx: 2, handshape: 'Open B', palm: 'down', shapeDesc: '平面 / 扁平或薄片狀', reason: '平面／扁平或薄片狀物體，依標準規則選用代形詞 / 手 / 放在桌面上。', conf: 93 },
+      { keywords: ['杯','瓶','壺','罐','桶','保溫','水壺','馬克杯','酒瓶','飲料','茶杯'], ruleIdx: 2, handshape: 'C', palm: 'up', shapeDesc: '圓柱形', reason: '圓柱形物體，依標準規則選用代形詞 / C / 呈現杯子的圓柱輪廓。', conf: 94 },
+      { keywords: ['筆','傘','雨傘','筷','尺','棒','牙刷','湯匙','叉子','吸管','遙控器','笛'], ruleIdx: 2, handshape: '1', palm: 'up', shapeDesc: '長條形', reason: '長條形物體，依標準規則選用代形詞 / 一 /（或保留筆的打法）放在桌面上。', conf: 92 }
     ];
 
     function saveGeminiKey(val) {
@@ -2541,7 +2571,14 @@
 
     function renderLearnTab() {
       const sel = document.getElementById('learnVidObjSelect');
-      if (sel) sel.innerHTML = state.objects.map(o => `<option value="${o.id}">對應物件：${o.name} (${o.handshape})</option>`).join('');
+      if (sel) {
+        const prev = sel.value;
+        sel.innerHTML = state.objects.map(o => {
+          const r = state.rules.find(x => x.id === o.ruleId);
+          return `<option value="${o.id}">對應物件：${o.name}｜${o.shapeDesc || ''} · ${o.classifierTag || o.handshape}（${r?.code || ''}）</option>`;
+        }).join('');
+        if (prev && state.objects.some(o => o.id === prev)) sel.value = prev;
+      }
       const m = state.trainedModel;
       if (m) {
         document.getElementById('trainedModelBadge').textContent = `已訓練 · ${m.accuracy}%`;
@@ -2670,6 +2707,7 @@
 
     function buildSheetRowFromSample(s) {
       const rule = state.rules.find(r => r.id === s.ruleId);
+      const obj = state.objects.find(o => o.id === s.objectId);
       const analysis = s.frames?.length >= 5 ? analyzeLandmarkSequence(s.frames, s.objectId) : null;
       const startMs = s.frames?.[0]?.timestampMs || 0;
       const endMs = s.frames?.[s.frames.length - 1]?.timestampMs || 0;
@@ -2696,7 +2734,9 @@
         is_put_verified: Boolean(analysis?.isPut),
         video_url: s.videoUrl || '',
         created_at: s.createdAt || new Date().toISOString(),
-        compact_landmarks: packFramesForSheet(s.frames, 48)
+        compact_landmarks: packFramesForSheet(s.frames, 48),
+        object_feature: s.objectFeature || obj?.shapeDesc || '',
+        classifier_tag: s.classifierTag || obj?.classifierTag || ''
       };
     }
 
@@ -2900,7 +2940,7 @@
         let merged = 0;
         for (const r of (data.samples || [])) {
           const frames = unpackFramesFromSheet(r.compact_landmarks, r.handedness || 'right');
-          if (!frames.length) continue;
+          if (!frames.length && !r.video_url) continue;
           const obj = state.objects.find(o => o.id === r.object_id) || state.objects[0];
           const smp = {
             id: String(r.sample_id),
@@ -2908,6 +2948,8 @@
             label: String(r.label || '雲端語料'),
             signerId: String(r.signer_id || 'D01'),
             objectId: r.object_id || obj.id,
+            objectFeature: String(r.object_feature || obj.shapeDesc || ''),
+            classifierTag: String(r.classifier_tag || obj.classifierTag || ''),
             ruleId: obj.ruleId,
             dhShape: r.dh_shape || obj.handshape,
             dhPalm: r.dh_palm || 'up',
@@ -2942,13 +2984,14 @@
       const base = window.location.href.split('?')[0];
       if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址，才能產生受試者專屬連結！'; return; }
       const encoded = btoa(unescape(encodeURIComponent(url)));
-      const shareUrl = `${base}?mode=participant&k=${encodeURIComponent(encoded)}`;
+      const recordPageUrl = new URL('record.html', base).href;
+      const shareUrl = `${recordPageUrl}?k=${encodeURIComponent(encoded)}`;
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(shareUrl).then(() => {
-          document.getElementById('gsSyncMessage').textContent = '🔒 已複製「受試者專屬連結」！對方點開不會看到這個管理面板，也不能下載別人資料，只會自動把自己的錄影安全回傳給你。';
+          document.getElementById('gsSyncMessage').textContent = '🔒 已複製「受試者專屬錄製頁 (record.html)」連結！對方點開只會看到乾淨的逐題引導錄影頁，看不到任何管理後台或他人資料。';
         });
       } else {
-        prompt('請複製以下受試者專屬連結：', shareUrl);
+        prompt('請複製以下受試者專屬錄製連結：', shareUrl);
       }
     }
 
@@ -2961,17 +3004,17 @@
     // Export Standard Linguistic Annotation Table matching Course Final Report Slide 13!
     function exportLinguisticAnnotationCsv() {
       if (!state.samples.length) return;
-      const header = 'sample_id,signer_id,clip_type,label,rule_code,variant_id,dh_shape,dh_palm,ndh_mode,handedness,frame_count,start_ms,end_ms,duration_ms,ndh_hold_pct,path_dy,brow_up_max,is_put_verified,created_at';
+      const header = 'sample_id,signer_id,clip_type,label,object_feature,classifier_tag,rule_code,variant_id,dh_shape,dh_palm,ndh_mode,handedness,frame_count,start_ms,end_ms,duration_ms,ndh_hold_pct,path_dy,brow_up_max,is_put_verified,video_url,created_at';
       const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const rows = state.samples.map(s => {
         const r = buildSheetRowFromSample(s);
         const dur = Math.max(0, r.end_ms - r.start_ms);
-        const variantId = `${r.rule_code}_${r.dh_shape}_${r.ndh_mode}`;
+        const variantId = `${r.rule_code}_${r.classifier_tag || r.dh_shape}_${r.ndh_mode}`;
         return [
-          r.sample_id, r.signer_id, r.clip_type, r.label, r.rule_code, variantId,
-          r.dh_shape, r.dh_palm, r.ndh_mode, r.handedness, r.frame_count,
+          r.sample_id, r.signer_id, r.clip_type, r.label, r.object_feature, r.classifier_tag,
+          r.rule_code, variantId, r.dh_shape, r.dh_palm, r.ndh_mode, r.handedness, r.frame_count,
           r.start_ms, r.end_ms, dur, r.ndh_hold_pct, r.path_dy, r.brow_up_max,
-          r.is_put_verified ? 'TRUE' : 'FALSE', r.created_at
+          r.is_put_verified ? 'TRUE' : 'FALSE', r.video_url, r.created_at
         ].map(esc).join(',');
       });
       triggerDownload(new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_linguistic_annotations.csv');
@@ -3062,9 +3105,17 @@
     }
 
     function renderAll() {
-      const opts = state.objects.map(o => `<option value="${o.id}">${o.name} (${o.handshape})</option>`).join('');
+      const prevRec = document.getElementById('recObjectSelect')?.value;
+      const opts = state.objects.map(o => {
+        const r = state.rules.find(x => x.id === o.ruleId);
+        return `<option value="${o.id}">${o.name}｜${o.shapeDesc || ''} · ${o.classifierTag || o.handshape}（${r?.code || ''}）</option>`;
+      }).join('');
       document.getElementById('recObjectSelect').innerHTML = opts;
       document.getElementById('simActionSelect').innerHTML = opts;
+      if (prevRec && state.objects.some(o => o.id === prevRec)) {
+        document.getElementById('recObjectSelect').value = prevRec;
+        document.getElementById('simActionSelect').value = prevRec;
+      }
       document.getElementById('recObjectSelect').onchange = () => {
         const o = state.objects.find(x => x.id === document.getElementById('recObjectSelect').value);
         if (!o) return;
@@ -3080,8 +3131,18 @@
     (async function init() {
       await openDatabase();
       const cfg = await idbGetAll('config');
-      if (cfg.find(c => c.key === 'rules')?.data?.length) state.rules = cfg.find(c => c.key === 'rules').data;
-      if (cfg.find(c => c.key === 'objects')?.data?.length) state.objects = cfg.find(c => c.key === 'objects').data;
+      if (cfg.find(c => c.key === 'rules')?.data?.length) {
+        const savedRules = cfg.find(c => c.key === 'rules').data;
+        const customRules = savedRules.filter(r => !DEFAULT_RULES.some(d => d.id === r.id));
+        state.rules = [...JSON.parse(JSON.stringify(DEFAULT_RULES)), ...customRules];
+        await idbPut('config', { key: 'rules', data: state.rules });
+      }
+      if (cfg.find(c => c.key === 'objects')?.data?.length) {
+        const savedObjs = cfg.find(c => c.key === 'objects').data;
+        const customObjs = savedObjs.filter(o => !DEFAULT_OBJECTS.some(d => d.id === o.id));
+        state.objects = [...JSON.parse(JSON.stringify(DEFAULT_OBJECTS)), ...customObjs];
+        await idbPut('config', { key: 'objects', data: state.objects });
+      }
       if (cfg.find(c => c.key === 'trainedModel')?.data) state.trainedModel = cfg.find(c => c.key === 'trainedModel').data;
       if (cfg.find(c => c.key === 'learningLog')?.data?.length) state.learningLog = cfg.find(c => c.key === 'learningLog').data;
       if (cfg.find(c => c.key === 'evaluations')?.data?.length) state.evaluations = cfg.find(c => c.key === 'evaluations').data;
