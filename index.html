@@ -1113,8 +1113,33 @@
       const tol = state.tolerance || { dyMin: 0.08, contactRatio: 0.25, normalizeScale: true };
       const realLive = frames.filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
       const sourceFrames = realLive.length >= 5 ? realLive : frames;
-      const valid = sourceFrames.filter(f => f && f.dominant);
-      if (valid.length < 5) return { isPut: false, sentence: '未偵測到足夠主手影格', trace: ['主手影格不足'] };
+      const rawValid = sourceFrames.filter(f => f && f.dominant);
+      if (rawValid.length < 5) return { isPut: false, sentence: '未偵測到足夠主手影格', trace: ['主手影格不足'] };
+
+      // 0. Hand-over-Hand Occlusion Carry-Forward (非主手交叉遮擋記憶補強)
+      // When DH crosses in front of / lands on NDH during PUT co-articulation, 2D MediaPipe may temporarily lose NDH.
+      // Because NDH is spatially anchored as the table buoy (/ 手 /) in TSL PUT, carry forward the recent NDH anchor when DH is near it!
+      let lastNdh = null, lastNdhIdx = -99, occludedCount = 0;
+      const occStart = Math.floor(rawValid.length * 0.35);
+      const valid = rawValid.map((f, i) => {
+        if (f.nonDominant) {
+          lastNdh = f.nonDominant;
+          lastNdhIdx = i;
+          return f;
+        }
+        if (i >= occStart && lastNdh && (i - lastNdhIdx) <= 18) {
+          const dp = getPalmCenter(f.dominant);
+          const np = getPalmCenter(lastNdh);
+          if (dp && np && Math.hypot(dp.x - np.x, dp.y - np.y) < 0.30) {
+            occludedCount++;
+            return { ...f, nonDominant: { ...lastNdh, occluded: true } };
+          }
+        }
+        return f;
+      });
+      if (occludedCount > 0) {
+        trace.push(`🛡️ 交叉遮擋補強：偵測到 ${occludedCount} 幀雙手重疊遮擋副手，已由「非主手定格記憶」自動補全！`);
+      }
 
       // 1. Sliding Peak-to-Contact Window Detection using PALM CENTER (Landmark 9), not wrist!
       const searchStart = Math.floor(valid.length * 0.25);
@@ -1130,11 +1155,12 @@
         const np = getPalmCenter(f.nonDominant);
         const hx = Math.abs(dp.x - np.x);
         const vy = np.y - dp.y; // > 0 when DH is above NDH, ~0 when stacked palm-on-palm
-        // Prefer PUT landing frames (only penalize palm-down Open B '桌子' pose; allow Bent 5/C/1 with palm in/up/down!)
+        // Prefer PUT landing frames (only penalize palm-down Open B '桌子' pose; reward Open B table buoy on NDH!)
         const vertPenalty = vy < -0.08 ? Math.abs(vy + 0.08) * 2.5 : Math.abs(vy - 0.04);
         const isTablePose = (f.dominant.handshape === 'Open B' && f.dominant.palm === 'down');
         const palmPenalty = isTablePose ? 0.22 : (f.dominant.palm === 'up' || f.dominant.palm === 'in' ? 0 : 0.03);
-        const score = Math.hypot(hx, vertPenalty) + palmPenalty;
+        const buoyBonus = (f.nonDominant.handshape === 'Open B') ? -0.05 : 0;
+        const score = Math.hypot(hx, vertPenalty) + palmPenalty + buoyBonus;
         if (score < bestDist) {
           bestDist = score;
           bestIdx = i;
@@ -1623,7 +1649,7 @@
               };
             }
 
-            // Hands (42pt)
+            // Hands (42pt) + Pose-Assisted Occlusion Carry-Forward (主副手交叉遮擋記憶)
             const dhTarget = state.handedness === 'right' ? 'Right' : 'Left';
             (handRes.landmarks || []).forEach((lm, idx) => {
               const rawLabel = handRes.handedness?.[idx]?.[0]?.categoryName || 'Right';
@@ -1633,8 +1659,29 @@
               const obj = { side: rawLabel, handshape: shape, palm, wrist: { x: mirroredPts[0].x, y: mirroredPts[0].y }, landmarks: mirroredPts };
               if (rawLabel === dhTarget) dh = obj; else ndh = obj;
             });
+            if (ndh) {
+              state.lastKnownNdh = ndh;
+              state.lastKnownNdhTs = nowTs;
+            } else if (dh && state.lastKnownNdh && (nowTs - (state.lastKnownNdhTs || 0)) <= 1000) {
+              const dp = getPalmCenter(dh), np = getPalmCenter(state.lastKnownNdh);
+              if (dp && np && Math.hypot(dp.x - np.x, dp.y - np.y) < 0.30) {
+                // Anchor gently to Pose non-dominant wrist (idx 15 for Left / 16 for Right) if close
+                const pWrist = poseSummary?.landmarks?.[state.handedness === 'right' ? 15 : 16];
+                let dx = 0, dy = 0;
+                if (pWrist && Math.hypot(pWrist.x - state.lastKnownNdh.wrist.x, pWrist.y - state.lastKnownNdh.wrist.y) < 0.14) {
+                  dx = (pWrist.x - state.lastKnownNdh.wrist.x) * 0.45;
+                  dy = (pWrist.y - state.lastKnownNdh.wrist.y) * 0.45;
+                }
+                ndh = {
+                  ...state.lastKnownNdh,
+                  occluded: true,
+                  wrist: { x: state.lastKnownNdh.wrist.x + dx, y: state.lastKnownNdh.wrist.y + dy },
+                  landmarks: state.lastKnownNdh.landmarks.map(p => ({ x: p.x + dx, y: p.y + dy, z: p.z || 0 }))
+                };
+              }
+            }
             const handCount = (dh ? 1 : 0) + (ndh ? 1 : 0);
-            if (ndh) drawHandSkeleton(ctx, ndh.landmarks, canvas.width, canvas.height, '#32a890', `非主手 ${formatHandshapeTag(ndh.handshape)} (${ndh.palm === 'down' ? '朝下' : '朝上'})`);
+            if (ndh) drawHandSkeleton(ctx, ndh.landmarks, canvas.width, canvas.height, ndh.occluded ? 'rgba(50,168,144,0.65)' : '#32a890', `副手 ${formatHandshapeTag(ndh.handshape)}${ndh.occluded ? ' (遮擋記憶)' : ` (${ndh.palm === 'down' ? '朝下' : '朝上'})`}`);
             if (dh) drawHandSkeleton(ctx, dh.landmarks, canvas.width, canvas.height, '#f5b841', `主手 ${formatHandshapeTag(dh.handshape)} (${dh.palm === 'up' ? '朝上' : '朝下'})`);
             drawHolisticStatusPill(ctx, handCount, faceCount, poseCount);
 
@@ -1643,7 +1690,7 @@
               handedness: state.handedness, dominant: dh, nonDominant: ndh, pose: poseSummary, face: faceSummary
             };
             document.getElementById('liveDhReadout').textContent = dh ? `主手：${formatHandshapeTag(dh.handshape)}（掌心${dh.palm === 'up' ? '朝上' : dh.palm === 'down' ? '朝下' : '朝側'}）` : '主手：未入鏡';
-            document.getElementById('liveNdhReadout').textContent = ndh ? `非主手：${formatHandshapeTag(ndh.handshape)}（掌心${ndh.palm === 'down' ? '朝下' : ndh.palm === 'up' ? '朝上' : '朝側'}）` : '非主手：未入鏡';
+            document.getElementById('liveNdhReadout').textContent = ndh ? `非主手：${formatHandshapeTag(ndh.handshape)}（${ndh.occluded ? '🛡️ 交叉遮擋記憶中' : `掌心${ndh.palm === 'down' ? '朝下' : ndh.palm === 'up' ? '朝上' : '朝側'}`}）` : '非主手：未入鏡';
             document.getElementById('liveHolisticReadout').textContent = `臉部 ${faceCount} · 姿勢 ${poseCount}${faceSummary && faceSummary.browUp > 0.35 ? ' · 挑眉' : ''}`;
           }
         } else {
@@ -2557,6 +2604,7 @@
         let mpTs = Math.round(performance.now()) + 5000;
 
         if (window.realMediaPipe?.ready && window.realMediaPipe.detector) {
+          let vidLastNdh = null, vidLastNdhIdx = -99;
           for (let i = 0; i < total; i++) {
             vid.currentTime = Math.min(dur - 0.04, i / fps);
             await new Promise(r => { vid.onseeked = r; setTimeout(r, 150); });
@@ -2569,6 +2617,14 @@
               const hand = { side: rawLabel, handshape: classifyRealHandshape(lm), palm: detectPalmOrientation(lm, rawLabel), wrist: { x: pts[0].x, y: pts[0].y }, landmarks: pts };
               if (rawLabel === dhTarget) dh = hand; else ndh = hand;
             });
+            if (ndh) {
+              vidLastNdh = ndh; vidLastNdhIdx = i;
+            } else if (dh && vidLastNdh && (i - vidLastNdhIdx) <= 15) {
+              const dp = getPalmCenter(dh), np = getPalmCenter(vidLastNdh);
+              if (dp && np && Math.hypot(dp.x - np.x, dp.y - np.y) < 0.30) {
+                ndh = { ...vidLastNdh, occluded: true };
+              }
+            }
             if (dh) extracted.push({ frameIndex: i, timestampMs: Math.round((i / fps) * 1000), phase: 'video_mp', handedness: state.handedness, dominant: dh, nonDominant: ndh });
           }
         }

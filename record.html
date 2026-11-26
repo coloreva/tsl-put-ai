@@ -692,7 +692,16 @@
             const hand = { side: rawLabel, handshape: classifyRealHandshape(lm), palm: detectPalmOrientation(lm, rawLabel), wrist: { x: pts[0].x, y: pts[0].y }, landmarks: pts };
             if (rawLabel === dhTarget) dh = hand; else ndh = hand;
           });
-          if (ndh) drawHand(ctx, ndh.landmarks, cv.width, cv.height, '#32a890');
+          if (ndh) {
+            app.lastKnownNdh = ndh;
+            app.lastKnownNdhTs = ts;
+          } else if (dh && app.lastKnownNdh && (ts - (app.lastKnownNdhTs || 0)) <= 1000) {
+            const dp = getPalmCenter(dh), np = getPalmCenter(app.lastKnownNdh);
+            if (dp && np && Math.hypot(dp.x - np.x, dp.y - np.y) < 0.30) {
+              ndh = { ...app.lastKnownNdh, occluded: true };
+            }
+          }
+          if (ndh) drawHand(ctx, ndh.landmarks, cv.width, cv.height, ndh.occluded ? 'rgba(50,168,144,0.6)' : '#32a890');
           if (dh) drawHand(ctx, dh.landmarks, cv.width, cv.height, '#f5b841');
           app.lastLiveFrame = { frameIndex: app.tick, timestampMs: Math.round(ts), phase: 'live', handedness: app.handedness, dominant: dh, nonDominant: ndh, pose: poseSummary, face: faceSummary };
         }
