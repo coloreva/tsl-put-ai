@@ -1546,19 +1546,28 @@
       document.getElementById('srcCamBtn').classList.toggle('btn-primary', src === 'camera');
       document.getElementById('srcSimBtn').classList.toggle('btn-primary', src === 'sim');
       document.getElementById('simPickerBar').classList.toggle('hidden', src === 'camera');
-      if (src === 'camera') startRealCamera(); else { stopRealCamera(); document.getElementById('recStatusText').textContent = '待命（Holistic 示範串流）'; }
+      if (src === 'camera') return startRealCamera();
+      stopRealCamera();
+      document.getElementById('recStatusText').textContent = '待命（Holistic 示範串流）';
+      return Promise.resolve(true);
     }
 
     async function startRealCamera() {
+      if (state.recStream) return true;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false });
         state.recStream = stream;
         const vid = document.getElementById('recVideo');
         vid.srcObject = stream; await vid.play();
         document.getElementById('recStatusText').textContent = window.realMediaPipe?.ready ? 'Holistic 553點 即時偵測中' : '鏡頭已啟動';
+        return true;
       } catch (e) {
         document.getElementById('recMessage').textContent = `無法啟動攝影機（${e.message}），切回示範模擬串流。`;
-        setRecordSource('sim');
+        state.recSource = 'sim';
+        document.getElementById('srcCamBtn').classList.remove('btn-primary');
+        document.getElementById('srcSimBtn').classList.add('btn-primary');
+        document.getElementById('simPickerBar').classList.remove('hidden');
+        return false;
       }
     }
     function stopRealCamera() { if (state.recStream) { state.recStream.getTracks().forEach(t => t.stop()); state.recStream = null; } }
@@ -1641,7 +1650,7 @@
           const objId = document.getElementById('simActionSelect').value || state.objects[0].id;
           const seq = synthesizeSequence({ objectId: objId }, 15, 2.5);
           const f = seq[Math.floor((simTick / 3) % seq.length)];
-          renderLandmarkFrame(canvas, f, 'Holistic 553點 示範串流（切換「真實鏡頭」即啟動 MediaPipe 臉部＋姿勢＋雙手追蹤）');
+          renderLandmarkFrame(canvas, f, 'Holistic 553點 示範串流（按「開始錄影」會自動開啟真實鏡頭！）');
           document.getElementById('liveDhReadout').textContent = `主手：${formatHandshapeTag(f.dominant.handshape)}（掌心${f.dominant.palm === 'up' ? '朝上' : '朝下'}）`;
           document.getElementById('liveNdhReadout').textContent = f.nonDominant ? `非主手：${formatHandshapeTag(f.nonDominant.handshape)}（掌心${f.nonDominant.palm === 'down' ? '朝下' : '朝上'}）` : '非主手：無';
           document.getElementById('liveHolisticReadout').textContent = '臉部 1 · 姿勢 1（示範）';
@@ -1650,19 +1659,42 @@
       requestAnimationFrame(runRecLoop);
     }
 
-    function toggleRecording() { state.isRecording ? stopRecording() : startRecording(); }
+    async function toggleRecording() {
+      if (state.isRecording) { stopRecording(); return; }
+      if (state.recSource !== 'camera' || !state.recStream) {
+        const btn = document.getElementById('btnStartRec');
+        btn.disabled = true; btn.textContent = '⏳ 自動開啟真實鏡頭中...';
+        document.getElementById('recMessage').textContent = '🎥 偵測到您目前在示範模式，已自動幫您切換並開啟「真實鏡頭」！';
+        const camOk = await setRecordSource('camera');
+        btn.disabled = false;
+        if (!camOk) {
+          btn.textContent = '● 開始錄影與擷取';
+          document.getElementById('recMessage').textContent = '⚠️ 無法開啟真實鏡頭（請允許瀏覽器相機權限後再按一次「開始錄影與擷取」）。';
+          return;
+        }
+        await new Promise(r => setTimeout(r, 300));
+      }
+      startRecording();
+    }
+
     function startRecording() {
       state.isRecording = true; state.lastLandmarks = []; state.recVideoChunks = []; state.lastVideoBlob = null;
       state.recStartTime = performance.now();
       document.getElementById('btnStartRec').textContent = '■ 停止錄影';
       document.getElementById('recDot').style.background = '#d15b42';
-      document.getElementById('recStatusText').textContent = '錄影與骨架擷取中...';
+      document.getElementById('recStatusText').textContent = '真實鏡頭錄影與骨架擷取中...';
+      document.getElementById('recMessage').textContent = '🔴 錄影中！請比出手語，比完後按「■ 停止錄影」。';
       const canvas = document.getElementById('recCanvas'), fps = Number(document.getElementById('recFpsSelect').value) || 15;
       try {
         const stream = canvas.captureStream(fps);
-        state.mediaRecorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
+        const candidates = ['video/webm;codecs=vp8', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4'];
+        const mime = candidates.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+        const blobType = mime ? mime.split(';')[0] : 'video/webm';
+        state.mediaRecorder = mime
+          ? new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 550000 })
+          : new MediaRecorder(stream);
         state.mediaRecorder.ondataavailable = e => { if (e.data?.size) state.recVideoChunks.push(e.data); };
-        state.mediaRecorder.onstop = () => { state.lastVideoBlob = new Blob(state.recVideoChunks, { type: 'video/webm' }); document.getElementById('btnDownloadVideo').disabled = false; };
+        state.mediaRecorder.onstop = () => { state.lastVideoBlob = new Blob(state.recVideoChunks, { type: blobType }); document.getElementById('btnDownloadVideo').disabled = false; };
         state.mediaRecorder.start(100);
       } catch (e) {}
 
@@ -1695,6 +1727,9 @@
       document.getElementById('recStatusText').textContent = `擷取完成 (${state.lastLandmarks.length} frames)`;
       const hasData = state.lastLandmarks.length > 0;
       ['btnSaveSample','btnExpJson','btnExpJsonl','btnExpCsv'].forEach(id => document.getElementById(id).disabled = !hasData);
+      document.getElementById('recMessage').textContent = hasData
+        ? `✅ 已錄好 ${state.lastLandmarks.length} 影格！請記得點擊右側「存入資料庫」才算正式儲存並同步至 Google 試算表與雲端硬碟！`
+        : '⚠️ 剛剛未偵測到手部入鏡，請確認雙手在畫面中後再重錄一次！';
     }
 
     state.overwriteSampleId = null;
