@@ -2423,13 +2423,21 @@
           : `✅ 已建立語者 ${signerId} 共 ${frames.length} 幀語料樣本並重新訓練！`;
         await appendLearningLog(`🎬 影片自學：語者 ${signerId}「${file.name}」→「${label}」(${usedRealMp ? '真實 MediaPipe' : '輔助模板'} ${frames.length} 幀)`);
         await trainSelfLearningModel();
+        let finalHtml = `✅ 全部完成！「${label}」（語者 ${signerId}，${frames.length} 幀）已存入本機並重新訓練。`;
         if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) {
-          statusEl.textContent += ' 正在同步至 Google 試算表與硬碟...';
-          await syncUploadSampleToGs(smp, file, `${signerId}_${file.name}`);
-          statusEl.textContent = `✅ 全部完成！「${label}」已解析訓練並同步至 Google 試算表與硬碟。`;
+          statusEl.textContent = '☁️ 正在同步骨架到 Google 試算表並上傳影片到硬碟...';
+          const syncRes = await syncUploadSampleToGs(smp, file, `${signerId}_${file.name}`, (msg) => { statusEl.textContent = msg; });
+          if (syncRes?.ok && syncRes.videoOk && syncRes.videoUrl) {
+            finalHtml = `✅ 骨架已進試算表 ＋ 影片已存進 Google 硬碟！` +
+              (isParticipantMode() ? '' : ` <a href="${syncRes.videoUrl}" target="_blank" style="color:var(--primary);font-weight:700;">🎬 開啟硬碟影片</a>`);
+          } else if (syncRes?.ok) {
+            finalHtml = `✅ 骨架已進試算表，但影片未存進硬碟：${syncRes.videoError || '請確認第 1 分頁已勾選「影片存進 Google 硬碟」'}`;
+          } else {
+            finalHtml = `⚠️ 本機已存檔訓練，但雲端同步失敗：${syncRes?.error || '請先至第 1 分頁點「連線測試」'}`;
+          }
         }
         cancelLearnVideoSelection();
-        statusEl.textContent = `✅ 全部完成！「${label}」（語者 ${signerId}，${frames.length} 幀）已存入資料庫並重新訓練。`;
+        statusEl.innerHTML = finalHtml;
       } catch (err) {
         statusEl.textContent = '解析失敗：' + err.message;
       } finally {
@@ -2705,22 +2713,78 @@
       });
     }
 
-    async function uploadVideoBlobToDrive(blob, smp, customFileName) {
-      const url = getGsEndpoint();
-      if (!url || !blob) return null;
+    async function compressVideoIfNeeded(blob) {
       const mb = blob.size / (1024 * 1024);
-      if (mb > 12) {
-        document.getElementById('gsSyncMessage').textContent = `⚠️ 影片大小 ${mb.toFixed(1)} MB 超過單檔 12 MB 上限（骨架已存入 Google 試算表，影片請本機保留）。`;
-        return null;
+      if (mb <= 4.5 || !window.MediaRecorder) return { blob, compressed: false };
+      return new Promise((resolve) => {
+        try {
+          const url = URL.createObjectURL(blob);
+          const vid = document.createElement('video');
+          vid.src = url; vid.muted = true; vid.playsInline = true;
+          vid.onloadedmetadata = async () => {
+            try {
+              const targetW = 480, targetH = Math.max(240, Math.round((vid.videoHeight / Math.max(1, vid.videoWidth)) * targetW) || 270);
+              const cv = document.createElement('canvas'); cv.width = targetW; cv.height = targetH;
+              const ctx = cv.getContext('2d');
+              const stream = cv.captureStream(15);
+              const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm';
+              const mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 450000 });
+              const chunks = [];
+              mr.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+              mr.onstop = () => {
+                URL.revokeObjectURL(url);
+                const out = new Blob(chunks, { type: 'video/webm' });
+                resolve(out.size > 1000 && out.size < blob.size ? { blob: out, compressed: true } : { blob, compressed: false });
+              };
+              const maxDur = Math.min(8.0, Math.max(1.5, vid.duration || 4.0));
+              mr.start(150);
+              await vid.play();
+              const draw = () => {
+                if (vid.paused || vid.ended || vid.currentTime >= maxDur) {
+                  vid.pause();
+                  if (mr.state !== 'inactive') mr.stop();
+                  return;
+                }
+                ctx.drawImage(vid, 0, 0, targetW, targetH);
+                requestAnimationFrame(draw);
+              };
+              requestAnimationFrame(draw);
+              setTimeout(() => { if (mr.state !== 'inactive') { vid.pause(); mr.stop(); } }, Math.round((maxDur + 0.8) * 1000));
+            } catch (e) { URL.revokeObjectURL(url); resolve({ blob, compressed: false }); }
+          };
+          vid.onerror = () => { URL.revokeObjectURL(url); resolve({ blob, compressed: false }); };
+        } catch (e) { resolve({ blob, compressed: false }); }
+      });
+    }
+
+    async function uploadVideoBlobToDrive(blob, smp, customFileName, onStatus = null) {
+      const url = getGsEndpoint();
+      if (!url || !blob) return { ok: false, error: '未設定試算表網址或無影片檔' };
+      let uploadBlob = blob;
+      let mb = uploadBlob.size / (1024 * 1024);
+      if (mb > 4.5) {
+        const msg = `🔄 原始影片 ${mb.toFixed(1)} MB 較大，正在自動壓縮成輕量檔以穩定上傳 Google 硬碟...`;
+        setSyncStatus(msg); if (onStatus) onStatus(msg);
+        const comp = await compressVideoIfNeeded(uploadBlob);
+        if (comp.compressed) {
+          uploadBlob = comp.blob;
+          mb = uploadBlob.size / (1024 * 1024);
+        }
       }
-      document.getElementById('gsSyncMessage').textContent = `🎬 正在上傳影片（${mb.toFixed(2)} MB）至 Google 硬碟「TSL_PUT_影片語料庫」...`;
+      if (mb > 12) {
+        const msg = `⚠️ 影片大小 ${mb.toFixed(1)} MB 超過 Google Apps Script 單檔 12 MB 上限（骨架已存入 Google 試算表，影片請縮短為 5 秒內再試）。`;
+        setSyncStatus(msg); if (onStatus) onStatus(msg);
+        return { ok: false, error: msg };
+      }
+      const upMsg = `🎬 正在上傳影片（${mb.toFixed(2)} MB）至 Google 硬碟「TSL_PUT_影片語料庫」...`;
+      setSyncStatus(upMsg); if (onStatus) onStatus(upMsg);
       try {
-        const b64 = await blobToBase64(blob);
+        const b64 = await blobToBase64(uploadBlob);
         const safeSigner = (smp?.signerId || 'D01').replace(/[^\w\-]/g, '');
         const safeLabel = (smp?.label || 'tsl_clip').replace(/[\\/:*?"<>|\s]+/g, '_');
-        const mime = blob.type || 'video/webm';
+        const mime = uploadBlob.type || 'video/webm';
         const ext = mime.includes('mp4') ? 'mp4' : (mime.includes('quicktime') ? 'mov' : 'webm');
-        const fileName = customFileName || `${safeSigner}_${safeLabel}_${Date.now()}.${ext}`;
+        const fileName = customFileName ? customFileName.replace(/\.[^.]+$/, '.' + ext) : `${safeSigner}_${safeLabel}_${Date.now()}.${ext}`;
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -2745,12 +2809,13 @@
             `✅ 已安全回傳給研究者：「${smp?.label || '語料'}」（含影片備份）！`,
             `✅ 骨架已進試算表 ＋ 影片已存入 Google 硬碟！<a href="${data.file_url}" target="_blank" style="color:var(--primary);font-weight:700;margin-left:6px;">🎬 開啟硬碟影片</a>`
           );
-          return data.file_url;
+          return { ok: true, videoUrl: data.file_url, fileName };
         }
         throw new Error(data.error || '硬碟寫入失敗');
       } catch (err) {
-        setSyncStatus(`⚠️ 骨架已安全回傳，但影片備份失敗（請稍後再試）：${err.message}`);
-        return null;
+        const errMsg = `⚠️ 骨架已存入，但影片上傳 Google 硬碟失敗：${err.message}`;
+        setSyncStatus(errMsg); if (onStatus) onStatus(errMsg);
+        return { ok: false, error: errMsg };
       }
     }
 
@@ -2774,8 +2839,8 @@
       }
     }
 
-    async function syncUploadSampleToGs(smp, videoBlob = null, customVideoName = null) {
-      const url = getGsEndpoint(); if (!url || !smp) return;
+    async function syncUploadSampleToGs(smp, videoBlob = null, customVideoName = null, onStatus = null) {
+      const url = getGsEndpoint(); if (!url || !smp) return { ok: false, error: '未設定試算表網址' };
       setSyncStatus(`☁️ 正在安全回傳「${smp.label}」...`);
       try {
         const row = buildSheetRowFromSample(smp);
@@ -2791,11 +2856,14 @@
             `✅ 已同步至 Google 試算表：「${smp.label}」（${Math.round(row.compact_landmarks.length / 1024 * 10) / 10} KB）`
           );
           if (videoBlob && document.getElementById('chkUploadVideoToDrive')?.checked) {
-            await uploadVideoBlobToDrive(videoBlob, smp, customVideoName);
+            const vRes = await uploadVideoBlobToDrive(videoBlob, smp, customVideoName, onStatus);
+            return { ok: true, videoOk: vRes.ok, videoUrl: vRes.videoUrl || '', videoError: vRes.error || '' };
           }
+          return { ok: true, videoOk: false, videoUrl: '', videoError: videoBlob ? '未勾選影片存進 Google 硬碟' : '' };
         } else throw new Error(data.error || '寫入失敗');
       } catch (err) {
         setSyncStatus(`回傳暫時失敗（資料已保存在您本機）：${err.message}`);
+        return { ok: false, error: err.message };
       }
     }
 
