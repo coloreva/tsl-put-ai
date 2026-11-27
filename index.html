@@ -243,7 +243,7 @@
               <option value="30">30 FPS</option>
             </select>
             <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:5px;cursor:pointer;">
-              <input id="chkConsentSigned" type="checkbox" checked />
+              <input id="chkConsentSigned" type="checkbox" />
               <span>已簽知情同意書（未簽不入訓練）</span>
             </label>
           </div>
@@ -643,7 +643,7 @@
               <label class="field-label">語者匿名代號（請勿填真名）</label>
               <input id="learnVidSignerId" type="text" value="D01" placeholder="匿名代號（如 D01、D02）" />
               <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:4px;cursor:pointer;">
-                <input id="chkLearnConsentSigned" type="checkbox" checked />
+                <input id="chkLearnConsentSigned" type="checkbox" />
                 <span>已簽知情同意書（未簽不可入訓練）</span>
               </label>
             </div>
@@ -1138,14 +1138,15 @@
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
-    // Item 1 & 11: Strict eligibility filter for training, consistency, and cross-signer evaluation
+    // Item 1, 2, 6, 11: Strict eligibility filter for training, consistency, and cross-signer evaluation
     function isTrainableRealSample(s) {
       if (!s || !s.frames || s.frames.length < 5) return false;
       const ds = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
       const rev = s.reviewStatus || '正常';
-      const consent = s.consentSigned || (ds === 'demo' ? '否' : '是');
-      const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && consent === '是') ? '是' : '否');
-      return ds === 'real' && rev === '正常' && consent === '是' && useTrain === '是' && (s.clipType || 'sentence') === 'sentence';
+      const consent = String(s.consentSigned || '');
+      const putOk = !s.putStatus || s.putStatus === '已驗證為放';
+      const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && putOk && consent === '是') ? '是' : '否');
+      return ds === 'real' && rev === '正常' && putOk && consent === '是' && useTrain === '是' && (s.clipType || 'sentence') === 'sentence';
     }
 
     // Item 3: Pre-save consistency validator for contradictory labels/object_id/rule/clip_type
@@ -1234,6 +1235,7 @@
         }
       }
 
+      const getTs = (f, idx) => (typeof f.timestampMs === 'number' && !isNaN(f.timestampMs)) ? Math.round(f.timestampMs) : Math.round(idx * 66);
       const winStart = Math.max(0, bestIdx - 6);
       const winEnd = Math.min(valid.length - 1, bestIdx + 5);
       const contactWin = valid.slice(winStart, winEnd + 1);
@@ -1260,19 +1262,35 @@
         ? `① 非主手（接觸視窗 #${bestIdx + 1}）：${formatHandshapeTag(ndhShape)}（掌心${ndhPalm === 'down' ? '朝下＝桌子' : ndhPalm === 'up' ? '朝上＝一般放底掌' : '朝側'}），穩定度 ${ndhHoldScore}%`
         : '① 非主手未偵測到（骨架中非主手為空，與「沒有打放」分開標記）');
 
-      // ② Observed DH handshape & palm orientation
-      const dhShape = majorityVote(contactWin.map(f => f.dominant.handshape), valid[bestIdx].dominant.handshape);
-      const dhPalm = majorityVote(contactWin.map(f => f.dominant.palm), valid[bestIdx].dominant.palm);
+      // ② Item 3: PUT Action Window [putStartIdx .. putEndIdx] & PUT-only observed_dh_shape
+      const contactTs = getTs(valid[bestIdx], bestIdx);
+      let putStartIdx = Math.max(0, bestIdx - 1);
+      let minDhY = getPalmCenter(valid[bestIdx].dominant).y;
+      for (let i = bestIdx; i >= Math.max(0, bestIdx - 24); i--) {
+        if (contactTs - getTs(valid[i], i) > 1200) break;
+        const py = getPalmCenter(valid[i].dominant).y;
+        if (py <= minDhY) { minDhY = py; putStartIdx = i; }
+      }
+      let putEndIdx = Math.min(valid.length - 1, bestIdx + 2);
+      for (let i = bestIdx + 1; i < Math.min(valid.length, bestIdx + 11); i++) {
+        if (getTs(valid[i], i) - contactTs > 600) break;
+        const pPrev = getPalmCenter(valid[i - 1].dominant);
+        const pCur = getPalmCenter(valid[i].dominant);
+        if (Math.hypot(pCur.x - pPrev.x, pCur.y - pPrev.y) < 0.038) {
+          putEndIdx = i;
+        } else if (i > bestIdx + 2) {
+          break;
+        }
+      }
+      const putStartMs = ndhDetected ? getTs(valid[putStartIdx], putStartIdx) : 0;
+      const putEndMs = ndhDetected ? getTs(valid[putEndIdx], putEndIdx) : 0;
+      const putSegment = valid.slice(putStartIdx, putEndIdx + 1);
+      const dhShape = majorityVote(putSegment.map(f => f.dominant.handshape), valid[bestIdx].dominant.handshape);
+      const dhPalm = majorityVote(putSegment.map(f => f.dominant.palm), valid[bestIdx].dominant.palm);
       const spec = HANDSHAPE_SPECS[dhShape] || HANDSHAPE_SPECS['Open O'];
-      trace.push(`② 實際主手手形：${formatHandshapeTag(dhShape)} (${dhShape}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'} · ${spec.category}`);
+      trace.push(`② 「放」動作時段（${putStartMs}ms → ${putEndMs}ms，共 ${putSegment.length} 幀）主手實際手形：${formatHandshapeTag(dhShape)} (${dhShape}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'} · ${spec.category}`);
 
       // ③ Peak-to-Contact downward trajectory & palm-center proximity
-      const lookbackStart = Math.max(0, bestIdx - 32);
-      let minDhY = 1.0;
-      for (let i = lookbackStart; i <= bestIdx; i++) {
-        const py = getPalmCenter(valid[i].dominant).y;
-        if (py < minDhY) minDhY = py;
-      }
       const contactDh = getPalmCenter(valid[bestIdx].dominant);
       const contactNdh = valid[bestIdx].nonDominant ? getPalmCenter(valid[bestIdx].nonDominant) : null;
       const peakDropDy = contactDh.y - minDhY;
@@ -1391,6 +1409,7 @@
       }
       return {
         isPut, putStatus, sentence, ndhHoldScore,
+        putStartMs, putEndMs,
         observedDh: dhShape, observedNdh, detectedOrderType,
         ndhSummary: ndhDetected ? `${formatHandshapeTag(ndhShape)} · 掌心${ndhPalm === 'down' ? '朝下(桌子)' : ndhPalm === 'up' ? '朝上(一般放)' : '朝側'}` : '非主手未偵測到',
         dhShape, dhSummary: `${formatHandshapeTag(dhShape)} (${dhShape}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
@@ -1941,11 +1960,18 @@
       }
 
       const dataSource = state.recSource === 'camera' ? 'real' : 'demo';
-      const consentSigned = (dataSource === 'real' && document.getElementById('chkConsentSigned')?.checked) ? '是' : '否';
-      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是') ? '是' : '否';
       const expectedDhShape = document.getElementById('recDhShape').value;
       const expectedNdhMode = document.getElementById('recNdhMode').value;
       const analysis = state.lastLandmarks.length >= 5 ? analyzeLandmarkSequence(state.lastLandmarks, obj?.id) : null;
+      const putStatus = clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）';
+      // Item 2: put_status !== '已驗證為放' CANNOT be auto-marked normal/trainable
+      if (clipType === 'sentence' && dataSource === 'real' && putStatus !== '已驗證為放' && reviewStatus === '正常') {
+        reviewStatus = '待人工確認';
+      }
+      // Item 6: Never auto-fill consent_signed unless explicitly checked by researcher
+      const consentSigned = (dataSource === 'real' && document.getElementById('chkConsentSigned')?.checked) ? '是' : '';
+      const putOk = (clipType !== 'sentence') || (putStatus === '已驗證為放');
+      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && putOk && consentSigned === '是') ? '是' : '否';
       const objectFeature = clipType === 'word_handshape' ? '手形教學示範' : (obj?.shapeDesc || '');
       const classifierTag = clipType === 'word_handshape' ? formatHandshapeTag(expectedDhShape) : (obj?.classifierTag || formatHandshapeTag(expectedDhShape));
       const nowIso = formatIsoTime(new Date());
@@ -1959,10 +1985,11 @@
           const updated = {
             ...state.samples[idx], dataSource, clipType, sentenceId, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
             objectFeature, classifierTag,
-            dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '',
+            dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '', observedDhShapeChecked: '否',
             dhPalm: obj?.palm || 'up',
             ndhMode: expectedNdhMode, expectedNdhMode, observedNdhMode: analysis?.observedNdh || '',
-            putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+            putStartMs: analysis?.putStartMs || 0, putEndMs: analysis?.putEndMs || 0,
+            putStatus,
             reviewStatus, consentSigned, useForTraining,
             sourceFile, sourceNote: `已重錄覆蓋 (${sourceNote})`, createdAt: nowIso,
             handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
@@ -1983,10 +2010,11 @@
         id: (dataSource === 'demo' ? 'demo_sim_' : 'smp_') + Date.now(),
         dataSource, clipType, sentenceId, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
         objectFeature, classifierTag,
-        dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '',
+        dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '', observedDhShapeChecked: '否',
         dhPalm: obj?.palm || 'up', dhAperture: '', intendedSize: '',
         ndhMode: expectedNdhMode, expectedNdhMode, observedNdhMode: analysis?.observedNdh || '',
-        putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+        putStartMs: analysis?.putStartMs || 0, putEndMs: analysis?.putEndMs || 0,
+        putStatus,
         actualOrder: '', orderType: analysis?.detectedOrderType || '', referentMentionedBefore: '',
         reviewStatus, consentSigned, useForTraining,
         sourceFile, sourceNote, createdAt: nowIso,
@@ -2062,6 +2090,7 @@
       const obj = state.objects.find(o => o.id === newObjId);
       const newExpectedShape = obj ? obj.handshape : (prev.expectedDhShape || prev.dhShape);
       const newObservedShape = document.getElementById(`editObsShape_${id}`)?.value ?? (prev.observedDhShape || '');
+      const newObsChecked = document.getElementById(`editObsChecked_${id}`)?.value || (newObservedShape !== (prev.observedDhShape || '') ? '是' : (prev.observedDhShapeChecked || '否'));
       const newObservedNdh = document.getElementById(`editObsNdh_${id}`)?.value ?? (prev.observedNdhMode || '');
       const newAperture = document.getElementById(`editAperture_${id}`)?.value ?? '';
       const newIntendedSize = document.getElementById(`editSize_${id}`)?.value ?? '';
@@ -2069,10 +2098,10 @@
       const newOrderType = document.getElementById(`editOrderType_${id}`)?.value ?? '';
       const newRefBefore = document.getElementById(`editRefBefore_${id}`)?.value ?? '';
       const newReview = document.getElementById(`editReview_${id}`)?.value || '正常';
-      const newConsent = document.getElementById(`editConsent_${id}`)?.value || '否';
+      const newConsent = document.getElementById(`editConsent_${id}`)?.value ?? '';
       let newUseTrain = document.getElementById(`editUseTrain_${id}`)?.value || '否';
       const dataSource = prev.dataSource || (String(prev.id).startsWith('demo_') ? 'demo' : 'real');
-      // Enforce Item 1 & 11 invariant: demo / duplicate / 待人工確認 / unsigned consent CANNOT be used for training
+      // Enforce Item 1, 2, 6, 11 invariant: demo / duplicate / 待人工確認 / unsigned consent CANNOT be used for training
       if (dataSource !== 'real' || newReview !== '正常' || newConsent !== '是') newUseTrain = '否';
 
       const updated = {
@@ -2085,6 +2114,7 @@
         ruleId: obj ? obj.ruleId : prev.ruleId,
         dhShape: newExpectedShape, expectedDhShape: newExpectedShape,
         observedDhShape: newObservedShape,
+        observedDhShapeChecked: newObsChecked,
         expectedNdhMode: obj ? obj.ndhMode : (prev.expectedNdhMode || prev.ndhMode || ''),
         observedNdhMode: newObservedNdh,
         dhAperture: newAperture, intendedSize: newIntendedSize,
@@ -2170,23 +2200,27 @@
         const sid = s.signerId || 'D01';
         const ds = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
         const rev = s.reviewStatus || '正常';
-        const consent = s.consentSigned || (ds === 'demo' ? '否' : '是');
-        const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && consent === '是') ? '是' : '否');
+        const consent = String(s.consentSigned ?? '');
+        const obsChecked = s.observedDhShapeChecked === '是' ? '是' : '否';
+        const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && (!s.putStatus || s.putStatus === '已驗證為放') && consent === '是') ? '是' : '否');
         const expSh = s.expectedDhShape || s.dhShape || '';
         const obsSh = s.observedDhShape || '';
+        const putSpanTxt = (s.putEndMs > s.putStartMs) ? ` · 放 ${s.putStartMs}–${s.putEndMs}ms` : '';
         const isEd = state.editingSampleId === s.id, isOv = state.overwriteSampleId === s.id;
         const typeBadge = s.clipType === 'word_handshape' ? '🖐️ 手形教學' : (s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (s.sentenceId || (r ? r.code : '句子'))));
         const statusPills = [
           ds === 'demo' ? '<span class="pill" style="color:var(--muted);">demo</span>' : '<span class="pill" style="color:var(--sage);border-color:var(--sage);">real</span>',
           rev === '待人工確認' ? '<span class="pill" style="color:var(--warn);border-color:var(--warn);">⚠️ 待人工確認</span>' : '',
           rev === 'duplicate' ? '<span class="pill" style="color:var(--primary);border-color:var(--primary);">duplicate</span>' : '',
-          s.putStatus === '非主手未偵測到' ? '<span class="pill" style="color:var(--warn);">非主手未偵測到</span>' : ''
+          s.putStatus === '非主手未偵測到' ? '<span class="pill" style="color:var(--warn);">非主手未偵測到</span>' : '',
+          s.putStatus === '非放動作' ? '<span class="pill" style="color:var(--warn);">非放動作</span>' : '',
+          obsChecked === '是' ? '<span class="pill" style="color:var(--sage);">✓手形已確認</span>' : ''
         ].filter(Boolean).join(' ');
         return `<div class="subcard space-y-sm" style="${isOv ? 'border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);' : ''}">
           <div class="between">
             <div>
               <b>${s.label}</b> ${statusPills} ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}
-              <div class="muted">代號 <b>${sid}</b> · 預期 ${formatHandshapeTag(expSh)}${obsSh ? ` / 實際 <b>${formatHandshapeTag(obsSh)}</b>` : ''} · 訓練:${useTrain} · ${s.frameCount}f</div>
+              <div class="muted">代號 <b>${sid}</b> · 預期 ${formatHandshapeTag(expSh)}${obsSh ? ` / 實際 <b>${formatHandshapeTag(obsSh)}</b>` : ''}${putSpanTxt} · 同意:${consent||'未填'} · 訓練:${useTrain} · ${s.frameCount}f</div>
             </div>
             <span class="pill">${typeBadge}</span>
           </div>
@@ -2195,9 +2229,10 @@
               <div><label class="field-label">句型／單詞名稱</label><input id="editLabel_${s.id}" type="text" value="${s.label}" /></div>
               <div><label class="field-label">語者匿名代號（勿填真名）</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
             </div>
-            <div class="grid-2">
+            <div class="grid-3">
               <div><label class="field-label">關聯物件（自動填預期手形）</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || formatHandshapeTag(o.handshape)}）</option>`).join('')}</select></div>
-              <div><label class="field-label">實際觀察主手手形 (observed)</label><select id="editObsShape_${s.id}">${mkOpts([['','（自動/未填）'], ...HANDSHAPE_ORDER.map(sh => [sh, formatHandshapeTag(sh)]), ['其他','其他變體']], obsSh)}</select></div>
+              <div><label class="field-label">「放」時段實際手形 (observed)</label><select id="editObsShape_${s.id}">${mkOpts([['','（自動/未填）'], ...HANDSHAPE_ORDER.map(sh => [sh, formatHandshapeTag(sh)]), ['其他','其他變體']], obsSh)}</select></div>
+              <div><label class="field-label">實際手形已人工確認</label><select id="editObsChecked_${s.id}">${mkOpts([['否','否（系統建議）'],['是','是（已人工確認）']], obsChecked)}</select></div>
             </div>
             <div class="grid-3">
               <div><label class="field-label">手形張開程度</label><select id="editAperture_${s.id}">${mkOpts([['','未填'],['全開','全開'],['微開','微開'],['半閉','半閉'],['閉合','閉合']], s.dhAperture)}</select></div>
@@ -2211,7 +2246,7 @@
             </div>
             <div class="grid-3">
               <div><label class="field-label">審核狀態</label><select id="editReview_${s.id}">${mkOpts([['正常','正常'],['待人工確認','待人工確認'],['duplicate','duplicate']], rev)}</select></div>
-              <div><label class="field-label">已簽知情同意書</label><select id="editConsent_${s.id}">${mkOpts([['是','是'],['否','否']], consent)}</select></div>
+              <div><label class="field-label">已簽知情同意書（手動填）</label><select id="editConsent_${s.id}">${mkOpts([['','（未填）'],['是','是'],['否','否']], consent)}</select></div>
               <div><label class="field-label">納入模型訓練</label><select id="editUseTrain_${s.id}">${mkOpts([['是','是'],['否','否']], useTrain)}</select></div>
             </div>
             <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存標註</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
@@ -2939,19 +2974,27 @@
         const frames = usedRealMp ? extracted : synthesizeSequence({ objectId: obj.id }, fps, dur);
         const analysis = frames.length >= 5 ? analyzeLandmarkSequence(frames, obj.id) : null;
         const dataSource = usedRealMp ? 'real' : 'demo';
-        const consentSigned = (dataSource === 'real' && document.getElementById('chkLearnConsentSigned')?.checked) ? '是' : '否';
-        const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是') ? '是' : '否';
+        const putStatus = clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）';
+        // Item 2: put_status !== '已驗證為放' CANNOT be auto-marked normal/trainable
+        if (clipType === 'sentence' && dataSource === 'real' && putStatus !== '已驗證為放' && reviewStatus === '正常') {
+          reviewStatus = '待人工確認';
+        }
+        // Item 6: Never auto-fill consent_signed unless explicitly checked by researcher
+        const consentSigned = (dataSource === 'real' && document.getElementById('chkLearnConsentSigned')?.checked) ? '是' : '';
+        const putOk = (clipType !== 'sentence') || (putStatus === '已驗證為放');
+        const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && putOk && consentSigned === '是') ? '是' : '否';
         const smp = {
           id: 'vid_' + Date.now(), dataSource, clipType,
           sentenceId: clipType === 'sentence' ? (SENTENCE_MAP[obj.id]?.id || '') : '',
           label, signerId, objectId: obj.id, ruleId: obj.ruleId,
           objectFeature: obj.shapeDesc || '', classifierTag: obj.classifierTag || '',
           dhShape: obj.handshape, expectedDhShape: obj.handshape,
-          observedDhShape: analysis?.observedDh || '',
+          observedDhShape: analysis?.observedDh || '', observedDhShapeChecked: '否',
           dhPalm: obj.palm, dhAperture: '', intendedSize: '',
           ndhMode: obj.ndhMode, expectedNdhMode: obj.ndhMode,
           observedNdhMode: analysis?.observedNdh || '',
-          putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+          putStartMs: analysis?.putStartMs || 0, putEndMs: analysis?.putEndMs || 0,
+          putStatus,
           actualOrder: '', orderType: analysis?.detectedOrderType || '', referentMentionedBefore: '',
           reviewStatus, consentSigned, useForTraining,
           sourceFile: file.name,
@@ -3268,23 +3311,30 @@
       }
     }
 
-    // Build EXACT same 39-column Google Sheet payload as record.html & google_apps_script.gs!
+    // Build EXACT same 42-column Google Sheet payload as record.html & google_apps_script.gs v2.1!
     function buildSheetRowFromSample(s) {
       const rule = state.rules.find(r => r.id === s.ruleId);
       const obj = state.objects.find(o => o.id === s.objectId);
       const analysis = s.frames?.length >= 5 ? analyzeLandmarkSequence(s.frames, s.objectId) : null;
-      const startMs = s.frames?.[0]?.timestampMs || 0;
-      const endMs = s.frames?.[s.frames.length - 1]?.timestampMs || 0;
+      const startMs = Math.round(s.frames?.[0]?.timestampMs || 0);
+      const endMs = Math.round(s.frames?.[s.frames.length - 1]?.timestampMs || 0);
+      const putStartMs = Math.round(s.putStartMs || analysis?.putStartMs || 0);
+      const putEndMs = Math.round(s.putEndMs || analysis?.putEndMs || 0);
       const maxBrow = (s.frames || []).reduce((m, f) => Math.max(m, f?.face?.browUp || 0), 0);
       const dyMatch = (analysis?.trajSummary || '').match(/Δy=\+?(-?[\d.]+)/);
       const dataSource = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
-      const reviewStatus = s.reviewStatus || '正常';
-      const consentSigned = s.consentSigned || (dataSource === 'demo' ? '否' : '是');
-      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是' && s.useForTraining !== '否') ? '是' : '否';
       const clipType = s.clipType || 'sentence';
       const ndhHoldPct = analysis?.ndhHoldScore || 0;
       const putStatus = clipType !== 'sentence' ? '不適用（單詞/手形）' : (analysis?.putStatus || s.putStatus || '非放動作');
       const isPutVerified = (clipType === 'sentence' && ndhHoldPct >= 50 && Boolean(analysis?.isPut) && putStatus === '已驗證為放');
+      let reviewStatus = s.reviewStatus || '正常';
+      if (clipType === 'sentence' && dataSource === 'real' && putStatus !== '已驗證為放' && reviewStatus === '正常') {
+        reviewStatus = '待人工確認';
+      }
+      // Item 6: Never auto-fill consent_signed
+      const consentSigned = String(s.consentSigned ?? '').trim();
+      const putOk = (clipType !== 'sentence') || (putStatus === '已驗證為放');
+      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && putOk && consentSigned === '是' && s.useForTraining !== '否') ? '是' : '否';
 
       return {
         sample_id: s.id,
@@ -3294,22 +3344,25 @@
         sentence_id: s.sentenceId || (clipType === 'sentence' ? (SENTENCE_MAP[s.objectId]?.id || '') : ''),
         label: s.label || '',
         object_id: s.objectId || '',
-        object_feature: s.objectFeature || obj?.shapeDesc || '',
-        classifier_tag: s.classifierTag || obj?.classifierTag || '',
+        object_feature: obj?.shapeDesc || s.objectFeature || '',
+        classifier_tag: obj?.classifierTag || s.classifierTag || '',
         rule_code: clipType === 'word_handshape' ? '手形教學' : (clipType === 'word_noun' ? '單詞名詞' : (clipType === 'word_loc' ? '單詞處所' : (rule ? rule.code : '自訂'))),
-        expected_dh_shape: s.expectedDhShape || s.dhShape || obj?.handshape || '',
+        expected_dh_shape: obj?.handshape || s.expectedDhShape || s.dhShape || '',
         observed_dh_shape: s.observedDhShape || analysis?.observedDh || '',
-        dh_palm: s.dhPalm || 'up',
+        observed_dh_shape_checked: s.observedDhShapeChecked === '是' ? '是' : '否',
+        dh_palm: s.dhPalm || obj?.palm || 'up',
         dh_aperture: s.dhAperture || '',
         intended_size: s.intendedSize || '',
-        expected_ndh_mode: s.expectedNdhMode || s.ndhMode || obj?.ndhMode || '',
+        expected_ndh_mode: obj?.ndhMode || s.expectedNdhMode || s.ndhMode || '',
         observed_ndh_mode: s.observedNdhMode || analysis?.observedNdh || '',
         handedness: s.handedness || 'right',
-        fps: s.fps || 15,
-        frame_count: s.frameCount || (s.frames?.length || 0),
+        fps: Math.round(Number(s.fps || 15)),
+        frame_count: Math.round(Number(s.frameCount || (s.frames?.length || 0))),
         start_ms: startMs,
         end_ms: endMs,
-        ndh_hold_pct: ndhHoldPct,
+        put_start_ms: putStartMs,
+        put_end_ms: putEndMs,
+        ndh_hold_pct: Math.round(ndhHoldPct),
         path_dy: dyMatch ? Number(dyMatch[1]) : 0,
         brow_up_max: r3(maxBrow),
         put_status: putStatus,
@@ -3535,7 +3588,7 @@
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'upsert_batch', samples: rows })
+          body: JSON.stringify({ action: 'bulk_upsert_samples', samples: rows })
         });
         const data = await res.json();
         if (data.ok) {
@@ -3549,19 +3602,19 @@
     async function runSheetBackupAndMigrate() {
       const url = getGsEndpoint();
       if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址並儲存。'; return; }
-      if (!confirm('即將執行「試算表自動備份＋39 欄研究結構升級」：\n1. 先在 Google 雲端硬碟另存整份試算表備份副本（絕不刪除任何原始資料）\n2. 標記 demo / duplicate / 待人工確認 / 測試評估\n3. 匿名化真實姓名並獨立存檔對照表、重算所有放驗證\n4. 將硬碟影片設為「限制存取」\n\n確認執行？')) return;
-      document.getElementById('gsSyncMessage').textContent = '🛠️ 正在備份試算表並執行非破壞性資料清理與欄位升級...';
+      if (!confirm('即將執行「試算表自動備份＋42 欄研究結構升級 (v2.1)」：\n1. 先在 Google 雲端硬碟另存整份試算表備份副本（絕不刪除任何原始資料）\n2. 還原 frame_count 日期誤判並強制數字欄純數字格式\n3. 標記非放動作為待人工確認、只算「放」時段手形並新增 put_start_ms/put_end_ms\n4. 統一物件辭典／Sentences／Samples、匯出骨架 JSON 到硬碟、清空 consent_signed\n5. 匿名化 Evaluations.comment 與硬碟檔名/資料夾並鎖定 PRIVATE\n\n確認執行？')) return;
+      document.getElementById('gsSyncMessage').textContent = '🛠️ 正在備份試算表並執行非破壞性資料清理與欄位升級 (v2.1)...';
       try {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'migrate_sheet' })
+          body: JSON.stringify({ action: 'backup_and_migrate' })
         });
         const d = await res.json();
-        if (!d.ok) throw new Error(d.error || '遷移失敗（請確認 Apps Script 已貼上最新 v2.0 並部署「新版本」）');
-        const reviewTxt = (d.manual_review_list || []).length ? `；待人工確認：${d.manual_review_list.join('、')}` : '；無待人工確認樣本';
+        if (!d.ok) throw new Error(d.error || '遷移失敗（請確認 Apps Script 已貼上最新 v2.1 並部署「新版本」）');
+        const reviewTxt = (d.manual_review_list || []).length ? `；待人工確認(${d.manual_review_list.length})：${d.manual_review_list.join('、')}` : '；無待人工確認樣本';
         document.getElementById('gsSyncMessage').innerHTML =
-          `✅ 備份與升級完成！<a href="${d.backup_url}" target="_blank" style="color:var(--primary);font-weight:700;">📄 備份副本</a> · Samples 總計 <b>${d.total_samples}</b> 筆 · 可用於訓練(是) <b>${d.use_for_training_yes}</b> 筆 · 影片已限制存取 <b>${d.restricted_drive_files}</b> 檔${reviewTxt}`;
+          `✅ 備份與升級完成！<a href="${d.backup_url}" target="_blank" style="color:var(--primary);font-weight:700;">📄 備份副本</a> · Samples <b>${d.total_samples}</b> 筆 · 可訓(是) <b>${d.use_for_training_yes}</b> 筆（待填同意書即可訓：<b>${d.ready_pending_consent_count || 0}</b> 筆）· 匯出骨架 <b>${d.exported_landmarks_files || 0}</b> 檔 · 硬碟改名 <b>${(d.renamed_drive_items || []).length}</b> 項${reviewTxt}`;
         await syncPullFromGs();
       } catch (err) {
         document.getElementById('gsSyncMessage').textContent = `升級失敗：${err.message}`;
@@ -3573,7 +3626,7 @@
       if (!url) { document.getElementById('gsSyncMessage').textContent = '請先貼上 Google Apps Script 網址並儲存。'; return; }
       document.getElementById('gsSyncMessage').textContent = '🔄 正在從 Google 試算表下載同步所有語者語料...';
       try {
-        const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}action=list`);
+        const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}action=pull`);
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || '讀取失敗');
         let merged = 0;
@@ -3581,8 +3634,8 @@
           const frames = unpackFramesFromSheet(r.compact_landmarks, r.handedness || 'right');
           if (!frames.length && !r.video_url) continue;
           const obj = state.objects.find(o => o.id === r.object_id) || state.objects[0];
-          const expDh = r.expected_dh_shape || r.dh_shape || obj.handshape;
-          const expNdh = r.expected_ndh_mode || r.ndh_mode || obj.ndhMode;
+          const expDh = obj?.handshape || r.expected_dh_shape || r.dh_shape || '';
+          const expNdh = obj?.ndhMode || r.expected_ndh_mode || r.ndh_mode || '';
           const ds = r.data_source || (String(r.sample_id || '').startsWith('demo_') ? 'demo' : 'real');
           const smp = {
             id: String(r.sample_id),
@@ -3597,18 +3650,21 @@
             ruleId: obj.ruleId,
             dhShape: expDh, expectedDhShape: expDh,
             observedDhShape: String(r.observed_dh_shape || ''),
-            dhPalm: r.dh_palm || 'up',
+            observedDhShapeChecked: String(r.observed_dh_shape_checked || '否'),
+            dhPalm: r.dh_palm || obj.palm || 'up',
             dhAperture: String(r.dh_aperture || ''),
             intendedSize: String(r.intended_size || ''),
             ndhMode: expNdh, expectedNdhMode: expNdh,
             observedNdhMode: String(r.observed_ndh_mode || ''),
+            putStartMs: Number(r.put_start_ms || 0),
+            putEndMs: Number(r.put_end_ms || 0),
             putStatus: String(r.put_status || ''),
             actualOrder: String(r.actual_order || ''),
             orderType: String(r.order_type || ''),
             referentMentionedBefore: String(r.referent_mentioned_before || ''),
             reviewStatus: String(r.review_status || '正常'),
-            useForTraining: String(r.use_for_training || (ds === 'real' ? '是' : '否')),
-            consentSigned: String(r.consent_signed || (ds === 'real' ? '是' : '否')),
+            useForTraining: String(r.use_for_training || '否'),
+            consentSigned: String(r.consent_signed ?? ''),
             sourceFile: String(r.source_file || ''),
             sourceNote: String(r.source_note || ''),
             handedness: r.handedness || 'right',
@@ -3659,13 +3715,13 @@
       document.getElementById('participantSyncBanner')?.classList.remove('hidden');
     }
 
-    // Export Complete 38-Column Linguistic Annotation Table (excluding raw compact_landmarks)
+    // Export Complete 41-Column Linguistic Annotation Table (excluding raw compact_landmarks)
     function exportLinguisticAnnotationCsv() {
       if (!state.samples.length) return;
       const cols = [
         'sample_id','signer_id','data_source','clip_type','sentence_id','label','object_id','object_feature','classifier_tag','rule_code',
-        'expected_dh_shape','observed_dh_shape','dh_palm','dh_aperture','intended_size','expected_ndh_mode','observed_ndh_mode',
-        'handedness','fps','frame_count','start_ms','end_ms','duration_ms','ndh_hold_pct','path_dy','brow_up_max','put_status','is_put_verified',
+        'expected_dh_shape','observed_dh_shape','observed_dh_shape_checked','dh_palm','dh_aperture','intended_size','expected_ndh_mode','observed_ndh_mode',
+        'handedness','fps','frame_count','start_ms','end_ms','duration_ms','put_start_ms','put_end_ms','ndh_hold_pct','path_dy','brow_up_max','put_status','is_put_verified',
         'actual_order','order_type','referent_mentioned_before','review_status','use_for_training','consent_signed',
         'source_file','source_note','created_at','video_url','landmarks_file_url'
       ];
