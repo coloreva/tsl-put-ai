@@ -180,7 +180,10 @@
         <h1>🤟 台灣手語語料錄製平台</h1>
         <div class="muted">《台灣手語「放」共構結構研究》受試者專屬錄製頁</div>
       </div>
-      <span id="mpReadyBadge" class="pill">⏳ 載入手部追蹤模型中...</span>
+      <div class="row" style="gap:6px;">
+        <span id="connStatusBadge" class="pill">⏳ 檢查連線...</span>
+        <span id="mpReadyBadge" class="pill">⏳ 載入手部追蹤模型中...</span>
+      </div>
     </div>
 
     <!-- ===================================================== -->
@@ -204,8 +207,8 @@
 
       <div class="grid-2">
         <div>
-          <label class="field-label">您的受試者代號（由研究者提供或自填，如 D02）</label>
-          <input id="welcomeSignerId" type="text" value="D02" placeholder="例如：D02、D03" />
+          <label class="field-label">您的受試者匿名代號（請勿填真實姓名，例如：D02、D03）</label>
+          <input id="welcomeSignerId" type="text" value="D02" placeholder="例如：D02、D03（請用英文加數字代號）" />
         </div>
         <div>
           <label class="field-label">您的慣用手（主手）</label>
@@ -246,11 +249,10 @@
         <div id="stepDots" class="step-dots"></div>
       </div>
 
-      <!-- Big Clear Prompt Card -->
+      <!-- Big Clear Prompt Card (Non-leading! No fixed word order!) -->
       <div class="prompt-box">
-        <div id="taskCategoryTag" class="muted" style="font-weight:700;">請自然比出以下台灣手語句子</div>
+        <div id="taskCategoryTag" class="muted" style="font-weight:700;">請用您平常最自然的台灣手語表達以下句意（不限語序或比法）</div>
         <div id="taskSentenceText" class="prompt-sentence">蘋果放在桌子上</div>
-        <div id="taskHintText" class="prompt-hint">參考語序：蘋果 → 桌子 → 桌子＋蘋果代形詞「放」</div>
       </div>
 
       <!-- Stage: Live Camera OR Video Replay -->
@@ -306,9 +308,15 @@
       <div style="text-align:center;padding:8px 0;">
         <div style="font-size:52px;line-height:1.1;">🎉</div>
         <h1 style="margin-top:8px;">全部錄製完成！謝謝您的合作！</h1>
-        <p class="muted" style="font-size:15px;margin-top:6px;">
-          您已順利完成全部 <b id="doneTotalCount">7</b> 題台灣手語語料錄製並安全回傳給研究者。
+        <p id="doneSummaryText" class="muted" style="font-size:15px;margin-top:6px;">
+          您已順利完成全部 <b id="doneTotalCount">9</b> 題台灣手語語料錄製並安全回傳給研究者。
         </p>
+        <div id="offlineBackupBox" class="subcard hidden" style="margin-top:12px;border-color:var(--warn);text-align:center;">
+          <div style="color:var(--warn);font-weight:700;font-size:14px;">⚠️ 提醒：此網頁開啟時未帶入研究者的「受試者專屬連結」，資料尚未自動上傳雲端！</div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-primary" onclick="downloadOfflineBackupJson()">⬇️ 下載本次 9 題骨架備份檔 (.json) 傳給研究者</button>
+          </div>
+        </div>
       </div>
 
       <div class="subcard space-y-sm">
@@ -380,69 +388,60 @@
 
   <script>
     // =========================================================================
-    // 1. 錄製題庫設定（共 9 題：依標準代形詞與物體特徵對照表）
-    //    ※ 欄位設計與管理員介面 index.html 100% 完全一致（23 欄位）
+    // 1. 錄製題庫設定（共 9 題：不引導固定語序，尊重台灣手語自然彈性）
+    //    ※ 欄位設計與管理員介面 index.html / Apps Script 100% 完全一致（39 欄位）
     // =========================================================================
     const RECORDING_TASKS = [
       {
-        label: '蘋果放在桌子上',
-        hint: '請自然比出：蘋果 → 桌子 → 桌子＋蘋果代形詞「放」',
+        sentenceId: 'S01', label: '蘋果放在桌子上',
         clipType: 'sentence', objectId: 'obj_apple', ruleCode: '規則二',
         objectFeature: '較小圓形物', classifierTag: '依大小調整',
         dhShape: 'Open O', dhPalm: 'up', ndhMode: 'Open B_down'
       },
       {
-        label: '西瓜放在桌子上',
-        hint: '請自然比出：西瓜 → 桌子 → 桌子＋西瓜代形詞「放」',
+        sentenceId: 'S02', label: '西瓜放在桌子上',
         clipType: 'sentence', objectId: 'obj_watermelon', ruleCode: '規則三',
         objectFeature: '大型圓形物', classifierTag: '依大小調整',
         dhShape: 'Bent 5', dhPalm: 'up', ndhMode: 'Open B_down'
       },
       {
-        label: '衣服放在桌子上',
-        hint: '請自然比出：衣服 → 桌子 → 一般詞彙「放」',
+        sentenceId: 'S03', label: '衣服放在桌子上',
         clipType: 'sentence', objectId: 'obj_clothes', ruleCode: '規則一',
         objectFeature: '無固定形狀', classifierTag: '一般放 (8-084)',
         dhShape: 'Open B', dhPalm: 'up', ndhMode: 'Open B_up'
       },
       {
-        label: '杯子放在桌子上',
-        hint: '請自然比出：杯子 → 桌子 → 桌子＋杯子代形詞「放」',
+        sentenceId: 'S04', label: '杯子放在桌子上',
         clipType: 'sentence', objectId: 'obj_cup', ruleCode: '規則三',
         objectFeature: '圓柱形', classifierTag: '/ C /',
         dhShape: 'C', dhPalm: 'up', ndhMode: 'Open B_down'
       },
       {
-        label: '筆放在桌子上',
-        hint: '請自然比出：筆 → 桌子 → 桌子＋筆代形詞「放」',
+        sentenceId: 'S05', label: '筆放在桌子上',
         clipType: 'sentence', objectId: 'obj_pen', ruleCode: '規則三',
         objectFeature: '長條形', classifierTag: '/ 一 / 或保留筆的打法',
         dhShape: '1', dhPalm: 'up', ndhMode: 'Open B_down'
       },
       {
-        label: '書放在桌子上',
-        hint: '請自然比出：書 → 桌子 → 桌子＋書本代形詞「放」',
+        sentenceId: 'S06', label: '書放在桌子上',
         clipType: 'sentence', objectId: 'obj_book', ruleCode: '規則三',
         objectFeature: '平面 / 扁平物', classifierTag: '/ 手 /',
         dhShape: 'Open B', dhPalm: 'down', ndhMode: 'Open B_down'
       },
       {
-        label: '鳳梨放在桌子上',
-        hint: '請自然比出：鳳梨 → 桌子 → 桌子＋鳳梨代形詞「放」',
+        sentenceId: 'S07', label: '鳳梨放在桌子上',
         clipType: 'sentence', objectId: 'obj_pineapple', ruleCode: '規則三',
         objectFeature: '較大的立體水果', classifierTag: '依大小調整',
         dhShape: 'Bent 5', dhPalm: 'up', ndhMode: 'Open B_down'
       },
       {
-        label: '報紙放在桌子上',
-        hint: '請自然比出：報紙 → 桌子 → 桌子＋報紙代形詞「放」',
+        sentenceId: 'S08', label: '報紙放在桌子上',
         clipType: 'sentence', objectId: 'obj_newspaper', ruleCode: '規則三',
         objectFeature: '平面 / 薄片狀', classifierTag: '/ 手 /',
         dhShape: 'Open B', dhPalm: 'down', ndhMode: 'Open B_down'
       },
       {
-        label: '雨傘放在桌子上',
-        hint: '請自然比出：雨傘 → 桌子 → 桌子＋雨傘代形詞「放」',
+        sentenceId: 'S09', label: '雨傘放在桌子上',
         clipType: 'sentence', objectId: 'obj_umbrella', ruleCode: '規則三',
         objectFeature: '長條形', classifierTag: '/ 一 /',
         dhShape: '1', dhPalm: 'up', ndhMode: 'Open B_down'
@@ -467,7 +466,10 @@
       mediaRecorder: null,
       videoChunks: [],
       videoBlob: null,
-      replayUrl: null
+      replayUrl: null,
+      uploadedRows: 0,
+      uploadedVideos: 0,
+      localBackup: []
     };
 
     // =========================================================================
@@ -482,20 +484,39 @@
       if (ep && ep.startsWith('https://')) {
         sessionStorage.setItem('TSL_RECORD_EP', ep);
       }
-      app.endpoint = (sessionStorage.getItem('TSL_RECORD_EP') || '').trim();
+      // Priority: 1. Shareable link (?k=...) -> 2. sessionStorage -> 3. Researcher's own browser localStorage!
+      app.endpoint = (sessionStorage.getItem('TSL_RECORD_EP') || localStorage.getItem('TSL_GS_ENDPOINT') || '').trim();
       const sParam = params.get('signer');
       if (sParam) document.getElementById('welcomeSignerId').value = sParam;
-      if (!app.endpoint) document.getElementById('welcomeWarning').classList.remove('hidden');
+      const connBadge = document.getElementById('connStatusBadge');
+      if (app.endpoint) {
+        if (connBadge) {
+          connBadge.textContent = '☁️ 已連線研究資料庫';
+          connBadge.style.color = '#247a68';
+          connBadge.style.borderColor = '#247a68';
+        }
+      } else {
+        document.getElementById('welcomeWarning').classList.remove('hidden');
+        if (connBadge) {
+          connBadge.textContent = '⚠️ 練習模式（未連線）';
+          connBadge.style.color = '#c97a16';
+          connBadge.style.borderColor = '#c97a16';
+        }
+      }
       if (window.location.search && window.history?.replaceState) {
         window.history.replaceState({}, '', window.location.pathname);
       }
     })();
 
     // =========================================================================
-    // 3. IDENTICAL GEOMETRY & PACKING LOGIC AS ADMIN index.html (100% COMPATIBLE)
+    // 3. IDENTICAL GEOMETRY, PUT VERIFICATION & UNIFORM PACKING AS ADMIN index.html
     // =========================================================================
     function dist3(a, b) { return Math.hypot(a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)); }
     function r3(v) { return Math.round((Number(v) || 0) * 1000) / 1000; }
+    function formatIsoTime(d = new Date()) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
 
     function detectPalmOrientation(landmarks, handLabel) {
       const w = landmarks[0], idx = landmarks[5], pnk = landmarks[17];
@@ -520,7 +541,6 @@
       if (avgCurl < 0.42 && spread < 0.28 && aperture > 0.28 && aperture < 0.65) return 'Bent C';
       if ((spread >= 0.30 && aperture >= 0.46) || (spread >= 0.38 && avgCurl >= 0.22)) return 'Bent 5';
       if (aperture >= 0.46 && spread < 0.32) return 'C';
-      if (aperture < 0.20) return 'Flat O';
       return 'Open O';
     }
 
@@ -532,16 +552,42 @@
       return hand.wrist || null;
     }
 
-    function packFramesForSheet(frames, maxFrames = 48) {
+    function majorityVote(arr, fallback = '') {
+      const c = {};
+      for (const x of arr) if (x) c[x] = (c[x] || 0) + 1;
+      const best = Object.entries(c).sort((a, b) => b[1] - a[1])[0];
+      return best ? best[0] : fallback;
+    }
+
+    // Item 6: Strict UNIFORM TIME-INTERVAL sampling across ALL frames for compact_landmarks preview (full frames uploaded separately to Drive JSON!)
+    function packFramesForSheet(frames, maxFrames = 64) {
       if (!frames || !frames.length) return '[]';
-      const live = frames.filter(f => f && f.phase === 'live');
-      const src = live.length >= 5 ? live : frames;
+      const src = frames.filter(Boolean);
+      if (!src.length) return '[]';
+      const getTs = (f, idx) => (typeof f.timestampMs === 'number' && !isNaN(f.timestampMs)) ? f.timestampMs : idx * 66;
+      const t0 = getTs(src[0], 0);
+      const t1 = getTs(src[src.length - 1], src.length - 1);
+      const span = Math.max(1, t1 - t0);
+
       const encode = (limit) => {
         const out = [];
         const n = Math.min(limit, src.length);
+        let minJ = 0;
         for (let i = 0; i < n; i++) {
-          const idx = n === 1 ? 0 : Math.min(src.length - 1, Math.round((i / (n - 1)) * (src.length - 1)));
-          const f = src[idx];
+          let f;
+          if (n === src.length) {
+            f = src[i];
+          } else {
+            const targetMs = t0 + (i / Math.max(1, n - 1)) * span;
+            const maxJ = src.length - (n - i);
+            let bestJ = minJ, bestDiff = Infinity;
+            for (let j = minJ; j <= maxJ; j++) {
+              const diff = Math.abs(getTs(src[j], j) - targetMs);
+              if (diff < bestDiff) { bestDiff = diff; bestJ = j; }
+            }
+            minJ = bestJ + 1;
+            f = src[bestJ];
+          }
           const packHand = (h) => h ? [
             h.side === 'Left' ? 'L' : 'R',
             h.handshape || 'Open O',
@@ -555,49 +601,123 @@
         return JSON.stringify(out);
       };
       let str = encode(maxFrames);
-      if (str.length > 45000) str = encode(32);
-      if (str.length > 45000) str = encode(20);
+      if (str.length > 45000) str = encode(44);
+      if (str.length > 45000) str = encode(28);
       return str;
     }
 
-    // Build EXACT same 23-column Google Sheet payload as Admin index.html!
+    // Item 4 & 5: Real PUT verification & observed handshape calculation (NEVER marks TRUE when ndh_hold_pct < 50!)
+    function computePutMetrics(frames, clipType) {
+      if (clipType !== 'sentence') {
+        return { observedDh: '', observedNdh: '', ndhHoldPct: 0, pathDy: 0, putStatus: '不適用（單詞/手形）', isPutVerified: false };
+      }
+      const valid = (frames || []).filter(f => f && f.dominant);
+      if (valid.length < 5) {
+        return { observedDh: '', observedNdh: '非主手未偵測到', ndhHoldPct: 0, pathDy: 0, putStatus: '非主手未偵測到', isPutVerified: false };
+      }
+      const ndhAll = valid.filter(f => f.nonDominant);
+      if (ndhAll.length < 2) {
+        return {
+          observedDh: majorityVote(valid.map(f => f.dominant.handshape), ''),
+          observedNdh: '非主手未偵測到',
+          ndhHoldPct: 0, pathDy: 0,
+          putStatus: '非主手未偵測到',
+          isPutVerified: false
+        };
+      }
+      let bestIdx = valid.length - 1, bestScore = Infinity;
+      const searchStart = Math.floor(valid.length * 0.15);
+      for (let i = searchStart; i < valid.length; i++) {
+        if (!valid[i].nonDominant) continue;
+        const dp = getPalmCenter(valid[i].dominant), np = getPalmCenter(valid[i].nonDominant);
+        if (!dp || !np) continue;
+        const hx = Math.abs(dp.x - np.x), vy = np.y - dp.y;
+        const vp = vy < -0.08 ? Math.abs(vy + 0.08) * 2.5 : Math.abs(vy - 0.04);
+        const buoyBonus = valid[i].nonDominant.handshape === 'Open B' ? -0.05 : 0;
+        const sc = Math.hypot(hx, vp) + buoyBonus;
+        if (sc < bestScore) { bestScore = sc; bestIdx = i; }
+      }
+      const win = valid.slice(Math.max(0, bestIdx - 6), Math.min(valid.length, bestIdx + 6));
+      const ndhWin = win.filter(f => f.nonDominant);
+      const observedDh = majorityVote(win.map(f => f.dominant.handshape), '');
+      if (ndhWin.length < 2) {
+        return { observedDh, observedNdh: '非主手未偵測到', ndhHoldPct: 0, pathDy: 0, putStatus: '非主手未偵測到', isPutVerified: false };
+      }
+      const ndhShape = majorityVote(ndhWin.map(f => f.nonDominant.handshape), 'Open B');
+      const ndhPalm = majorityVote(ndhWin.map(f => f.nonDominant.palm), 'down');
+      const observedNdh = `${ndhShape}_${ndhPalm}`;
+
+      const steps = [];
+      for (let i = 1; i < ndhWin.length; i++) {
+        const p0 = getPalmCenter(ndhWin[i - 1].nonDominant), p1 = getPalmCenter(ndhWin[i].nonDominant);
+        if (p0 && p1) steps.push(Math.hypot(p1.x - p0.x, p1.y - p0.y));
+      }
+      steps.sort((a, b) => a - b);
+      const med = steps.length ? steps[Math.floor(steps.length * 0.5)] : 1;
+      const ndhHoldPct = Math.max(0, Math.min(100, Math.round((1 - med * 24) * 100)));
+
+      let minDhY = 1;
+      for (let i = Math.max(0, bestIdx - 28); i <= bestIdx; i++) {
+        const py = getPalmCenter(valid[i].dominant)?.y;
+        if (py !== undefined && py < minDhY) minDhY = py;
+      }
+      const cDh = getPalmCenter(valid[bestIdx].dominant), cNdh = getPalmCenter(valid[bestIdx].nonDominant);
+      const pathDy = r3(Math.max(0, (cDh?.y || 0) - minDhY));
+      const nearNdh = Boolean(cDh && cNdh && Math.abs(cDh.x - cNdh.x) < 0.22 && (cNdh.y - cDh.y) >= -0.08 && (cNdh.y - cDh.y) <= 0.28);
+      const isPutVerified = (ndhHoldPct >= 50) && nearNdh && (pathDy >= 0.045);
+      return {
+        observedDh, observedNdh, ndhHoldPct, pathDy,
+        putStatus: isPutVerified ? '已驗證為放' : '非放動作',
+        isPutVerified
+      };
+    }
+
+    // Build EXACT same 39-column Google Sheet payload as Admin index.html & Apps Script!
     function buildIdenticalSheetRow(task, sampleId, frames) {
       const startMs = frames[0]?.timestampMs || 0;
       const endMs = frames[frames.length - 1]?.timestampMs || 0;
       const maxBrow = frames.reduce((m, f) => Math.max(m, f?.face?.browUp || 0), 0);
-      // Lightweight peak drop & NDH stability summary (admin index.html can always re-analyze full landmarks!)
-      const valid = frames.filter(f => f && f.dominant);
-      let minDhY = 1, maxDhY = 0;
-      for (const f of valid) {
-        const py = getPalmCenter(f.dominant).y;
-        if (py < minDhY) minDhY = py;
-        if (py > maxDhY) maxDhY = py;
-      }
-      const pathDy = r3(Math.max(0, maxDhY - minDhY));
+      const m = computePutMetrics(frames, task.clipType);
       return {
         sample_id: sampleId,
         signer_id: app.signerId,
+        data_source: 'real',
         clip_type: task.clipType,
+        sentence_id: task.sentenceId || '',
         label: task.label,
         object_id: task.objectId,
+        object_feature: task.objectFeature || '',
+        classifier_tag: task.classifierTag || '',
         rule_code: task.ruleCode,
-        dh_shape: task.dhShape,
+        expected_dh_shape: task.dhShape,
+        observed_dh_shape: m.observedDh,
         dh_palm: task.dhPalm,
-        ndh_mode: task.ndhMode,
+        dh_aperture: '',
+        intended_size: '',
+        expected_ndh_mode: task.ndhMode,
+        observed_ndh_mode: m.observedNdh,
         handedness: app.handedness,
         fps: 15,
         frame_count: frames.length,
         start_ms: startMs,
         end_ms: endMs,
-        ndh_hold_pct: 0,
-        path_dy: pathDy,
+        ndh_hold_pct: m.ndhHoldPct,
+        path_dy: m.pathDy,
         brow_up_max: r3(maxBrow),
-        is_put_verified: task.clipType === 'sentence',
+        put_status: m.putStatus,
+        is_put_verified: m.isPutVerified,
+        actual_order: '',
+        order_type: '',
+        referent_mentioned_before: '',
+        review_status: '正常',
+        use_for_training: '是',
+        consent_signed: '是',
+        source_file: 'webcam_record.html',
+        source_note: '受試者錄製頁(record.html)',
+        created_at: formatIsoTime(new Date()),
         video_url: '',
-        created_at: new Date().toLocaleString('zh-TW', { hour12: false }),
-        compact_landmarks: packFramesForSheet(frames, 48),
-        object_feature: task.objectFeature || '',
-        classifier_tag: task.classifierTag || ''
+        landmarks_file_url: '',
+        compact_landmarks: packFramesForSheet(frames, 64)
       };
     }
 
@@ -713,7 +833,12 @@
     // 5. GUIDED SESSION WORKFLOW (WELCOME -> TASK 1..7 -> REPLAY -> SUBMIT -> DONE)
     // =========================================================================
     async function beginRecordingSession() {
-      app.signerId = (document.getElementById('welcomeSignerId').value || 'D02').trim() || 'D02';
+      const rawId = (document.getElementById('welcomeSignerId').value || '').trim();
+      if (!rawId || /[\u4e00-\u9fff]/.test(rawId)) {
+        alert('為了保護您的隱私，受試者代號請勿填寫真實姓名！請改填英文加數字的匿名代號（例如：D02、D03）。');
+        return;
+      }
+      app.signerId = rawId;
       app.handedness = document.getElementById('welcomeHandedness').value || 'right';
       app.privacyBlackBg = Boolean(document.getElementById('chkPrivacyBlackBg').checked);
 
@@ -750,9 +875,8 @@
         `<span class="step-dot ${app.completed.has(i) ? 'done' : (i === idx ? 'active' : '')}">${i + 1}. ${t.label.replace('放在桌子上', '')}</span>`
       ).join('');
 
-      document.getElementById('taskCategoryTag').textContent = task.clipType === 'sentence' ? '請自然比出以下台灣手語完整句子' : '【對照組】單純名詞手語';
+      document.getElementById('taskCategoryTag').textContent = '請用您平常最自然的台灣手語表達以下句意（不限語序或比法）';
       document.getElementById('taskSentenceText').textContent = task.label;
-      document.getElementById('taskHintText').textContent = task.hint;
 
       // Show live canvas, hide replay video
       document.getElementById('liveCanvas').classList.remove('hidden');
@@ -905,30 +1029,50 @@
       const btnSubmit = document.getElementById('btnSubmitClip');
       const btnRetake = document.getElementById('btnRetake');
       btnSubmit.disabled = true; btnRetake.disabled = true;
-      btnSubmit.textContent = '☁️ 安全送出中...';
+      btnSubmit.textContent = app.endpoint ? '☁️ 安全送出中...' : '💾 暫存本機中...';
 
       const task = RECORDING_TASKS[app.taskIdx];
       const sampleId = `rec_${app.signerId}_${task.objectId}_${Date.now()}`;
+      const row = buildIdenticalSheetRow(task, sampleId, app.frames);
+      app.localBackup.push({ ...row, frames: app.frames });
 
+      let vidOk = false;
       try {
         if (app.endpoint) {
-          setMsg('☁️ 正在安全回傳本題手語骨架資料...');
-          const row = buildIdenticalSheetRow(task, sampleId, app.frames);
+          setMsg('☁️ 正在安全回傳本題手語骨架資料至 Google 試算表...');
           const res1 = await fetch(app.endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'upsert_sample', sample: row })
           });
           const d1 = await res1.json();
-          if (!d1.ok) throw new Error(d1.error || '資料送出失敗');
+          if (!d1.ok) throw new Error(d1.error || '試算表寫入失敗');
+          app.uploadedRows++;
+
+          // Item 6: Upload FULL uncompressed frames JSON to Google Drive (Restricted!)
+          if (app.frames.length > 0) {
+            setMsg(`📦 正在備份完整 ${app.frames.length} 影格骨架 JSON 至研究硬碟...`);
+            try {
+              await fetch(app.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'upload_landmarks',
+                  sample_id: sampleId,
+                  signer_id: app.signerId,
+                  json_content: JSON.stringify({ sample_id: sampleId, signer_id: app.signerId, sentence_id: task.sentenceId, label: task.label, fps: 15, frame_count: app.frames.length, frames: app.frames })
+                })
+              });
+            } catch (e) {}
+          }
 
           if (app.videoBlob && app.videoBlob.size > 0 && app.videoBlob.size <= 12 * 1024 * 1024) {
-            setMsg('🎬 正在回傳本題影片至研究硬碟...');
+            setMsg('🎬 正在回傳本題影片至 Google 雲端硬碟...');
             const b64 = await blobToBase64(app.videoBlob);
             const safeLabel = task.label.replace(/[\\/:*?"<>|\s]+/g, '_');
             const mime = app.videoMime || app.videoBlob.type || 'video/webm';
             const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-            await fetch(app.endpoint, {
+            const res2 = await fetch(app.endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify({
@@ -941,6 +1085,10 @@
                 base64_data: b64
               })
             });
+            try {
+              const d2 = await res2.json();
+              if (d2.ok) { vidOk = true; app.uploadedVideos++; }
+            } catch (e) {}
           }
         }
 
@@ -948,7 +1096,11 @@
         if (app.taskIdx + 1 < RECORDING_TASKS.length) {
           btnRetake.disabled = false;
           loadTaskUI(app.taskIdx + 1);
-          setMsg(`✅ 第 ${app.taskIdx} 題已送出成功！請繼續錄製第 ${app.taskIdx + 1} 題。`);
+          if (app.endpoint) {
+            setMsg(`✅ 第 ${app.taskIdx} 題完整骨架${vidOk ? '與影片' : ''}已送入研究資料庫！請繼續錄製第 ${app.taskIdx + 1} 題。`);
+          } else {
+            setMsg(`⚠️ 第 ${app.taskIdx} 題僅本機練習（未帶入專屬連結，未上傳雲端）。請繼續第 ${app.taskIdx + 1} 題。`, true);
+          }
         } else {
           finishAllTasks();
         }
@@ -967,6 +1119,23 @@
       document.getElementById('view-done').classList.remove('hidden');
       document.getElementById('doneTotalCount').textContent = String(RECORDING_TASKS.length);
       document.getElementById('doneSignerCode').textContent = app.signerId;
+      const sumEl = document.getElementById('doneSummaryText');
+      if (app.endpoint && app.uploadedRows > 0) {
+        sumEl.innerHTML = `✅ 已成功上傳 <b>${app.uploadedRows}</b> 題完整骨架至研究資料庫，並備份 <b>${app.uploadedVideos}</b> 部影片（權限已設為限制存取）！`;
+      } else {
+        sumEl.innerHTML = `⚠️ 本次為<b>未連線練習模式</b>（網址未帶入研究者的「受試者專屬連結」），語料尚未自動上傳雲端。`;
+        document.getElementById('offlineBackupBox').classList.remove('hidden');
+      }
+    }
+
+    function downloadOfflineBackupJson() {
+      const blob = new Blob([JSON.stringify({ signer_id: app.signerId, handedness: app.handedness, samples: app.localBackup }, null, 2)], { type: 'application/json' });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = `TSL_PUT_${app.signerId}_backup_${Date.now()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(u), 1500);
     }
 
     async function sendCompletionFeedback() {
@@ -992,7 +1161,8 @@
                 timing_score: score,
                 naturalness_score: score,
                 comment,
-                created_at: new Date().toLocaleString('zh-TW', { hour12: false })
+                created_at: formatIsoTime(new Date()),
+                is_test: /test|測試/i.test(comment)
               }
             })
           });

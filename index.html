@@ -190,15 +190,15 @@
           <div>
             <label class="field-label">錄製類型（可先教 6 種手形與單詞，再錄完整句子！）</label>
             <select id="recClipType" onchange="onClipTypeChange()">
-              <option value="sentence">完整句子（物件 → 桌子 → 共構放）</option>
+              <option value="sentence">完整句子（不限語序：含物件、桌子、放三成分）</option>
               <option value="word_handshape">🖐️ 手形教學：教 AI 認得 / C /、/ 手 /、/ 一 /、/ 坤 /、/ 同 /、/ 果 /</option>
               <option value="word_noun">單詞教學：物件名詞（如 西瓜、衣服、蘋果、杯子、筆、鳳梨、報紙、雨傘）</option>
               <option value="word_loc">單詞教學：處所名詞（如 桌子）</option>
             </select>
           </div>
           <div>
-            <label class="field-label">語者編號（受試聾人 ID）</label>
-            <input id="recSignerId" type="text" value="D01" placeholder="如：D01、D02" />
+            <label class="field-label">語者匿名代號（請勿填真名，如 D01、D02）</label>
+            <input id="recSignerId" type="text" value="D01" placeholder="匿名代號：D01、D02" />
           </div>
         </div>
 
@@ -235,12 +235,17 @@
             </select>
           </div>
           <div>
-            <label class="field-label">取樣 FPS</label>
+            <label class="field-label">取樣 FPS & 知情同意</label>
             <select id="recFpsSelect">
               <option value="15" selected>15 FPS（建議）</option>
+              <option value="12">12 FPS</option>
               <option value="10">10 FPS</option>
               <option value="30">30 FPS</option>
             </select>
+            <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:5px;cursor:pointer;">
+              <input id="chkConsentSigned" type="checkbox" checked />
+              <span>已簽知情同意書（未簽不入訓練）</span>
+            </label>
           </div>
         </div>
 
@@ -329,12 +334,13 @@
               </label>
             </div>
             <div class="row" style="gap:6px;">
-              <button class="btn btn-sm" onclick="syncUploadAllToGs()">⬆️ 上傳全部</button>
+              <button class="btn btn-sm" onclick="syncUploadAllToGs()">⬆️ 上傳真實語料</button>
               <button class="btn btn-sm btn-primary" onclick="syncPullFromGs()">⬇️ 同步下載</button>
               <button class="btn btn-sm" onclick="copyShareableGsLink()" title="複製獨立乾淨的受試者錄製頁 (record.html) 專屬連結，對方看不到任何後台設定">🔒 複製受試者連結</button>
+              <button class="btn btn-sm" style="border-color:var(--warn);color:var(--warn);" onclick="runSheetBackupAndMigrate()" title="自動先在雲端硬碟備份一份副本，再補齊 39 欄研究欄位、標記 demo/duplicate/待人工確認、匿名化代號與重算放驗證（絕不刪原始資料）">🛠️ 備份並清理試算表</button>
             </div>
           </div>
-          <div id="gsSyncMessage" class="muted" style="font-size:11px;">綁定後，錄影存檔或上傳影片會自動寫入 Google 試算表，並將影片存進你 Google 硬碟的「TSL_PUT_影片語料庫」。</div>
+          <div id="gsSyncMessage" class="muted" style="font-size:11px;">綁定後，真實語料會自動寫入 Google 試算表，完整骨架 JSON 與影片以「限制存取」存進 Google 硬碟（示範資料絕不混入真實資料庫）。</div>
         </div>
 
         <div id="undoDeleteBar" class="subcard between hidden" style="border-color:var(--warn);font-size:12px;">
@@ -627,12 +633,20 @@
             <div>
               <label class="field-label">語料類型</label>
               <select id="learnVidClipType">
-                <option value="sentence">完整句子（物件→桌子→放）</option>
+                <option value="sentence">完整句子（不限語序：含物件、桌子、放）</option>
+                <option value="word_handshape">🖐️ 手形教學（單一手形示範）</option>
                 <option value="word_noun">單詞教學：物件名詞</option>
                 <option value="word_loc">單詞教學：處所（桌子）</option>
               </select>
             </div>
-            <div><label class="field-label">語者編號</label><input id="learnVidSignerId" type="text" value="D01" placeholder="語者 ID（如 D01）" /></div>
+            <div>
+              <label class="field-label">語者匿名代號（請勿填真名）</label>
+              <input id="learnVidSignerId" type="text" value="D01" placeholder="匿名代號（如 D01、D02）" />
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:4px;cursor:pointer;">
+                <input id="chkLearnConsentSigned" type="checkbox" checked />
+                <span>已簽知情同意書（未簽不可入訓練）</span>
+              </label>
+            </div>
           </div>
           <div class="row">
             <label class="btn btn-sm" style="cursor:pointer;">
@@ -649,7 +663,7 @@
             </div>
             <video id="learnVidPreviewPlayer" controls muted playsinline style="width:100%;max-height:220px;border-radius:10px;background:#0f1417;"></video>
           </div>
-          <div id="learnVidStatus" class="muted">請先點「📂 選擇影片預覽」，檢查影片與名稱都正確後再按「✅ 確認解析並上傳」。</div>
+          <div id="learnVidStatus" class="muted">請先點「📂 選擇影片預覽」，檢查影片與名稱都正確後再按「✅ 確認解析並上傳」（重複檔案或矛盾標籤會自動提醒）。</div>
         </div>
 
         <div class="subcard space-y-sm">
@@ -672,8 +686,8 @@
         <div class="subcard space-y">
           <div class="between">
             <div>
-              <div style="font-size:13px;font-weight:700;">③ DTW 自主訓練與跨語者評測（Leave-One-Signer-Out）</div>
-              <div class="muted">用前幾位聾人訓練、測試陌生聾人，自動產出期末報告實驗數據</div>
+              <div style="font-size:13px;font-weight:700;">③ DTW 自主訓練與跨語者評測（僅採真實＋已簽同意語料）</div>
+              <div class="muted">一律排除 demo、duplicate、待人工確認與未簽同意書資料；需至少 3 位真實語者才計算跨語者評測</div>
             </div>
             <div class="row">
               <button class="btn btn-primary btn-sm" onclick="trainSelfLearningModel()">⚡ 訓練模型</button>
@@ -681,20 +695,21 @@
             </div>
           </div>
           <div class="grid-3" style="text-align:center;">
-            <div class="card" style="padding:10px;"><div id="mlTrainCount" style="font-size:18px;font-weight:800;">—</div><div class="muted">樣本／語者</div></div>
-            <div class="card" style="padding:10px;"><div id="mlTrainAcc" style="font-size:18px;font-weight:800;color:var(--sage);">—</div><div class="muted">原型一致率</div></div>
+            <div class="card" style="padding:10px;"><div id="mlTrainCount" style="font-size:18px;font-weight:800;">—</div><div class="muted">真實可訓樣本／語者</div></div>
+            <div class="card" style="padding:10px;"><div id="mlTrainAcc" style="font-size:18px;font-weight:800;color:var(--sage);">—</div><div id="mlTrainAccLabel" class="muted">單一語者內部一致率</div></div>
             <div class="card" style="padding:10px;"><div id="mlLearnedDy" style="font-size:18px;font-weight:800;">—</div><div class="muted">自學位移</div></div>
           </div>
           <div id="mlPrototypeReport" class="muted">尚未訓練模型。訓練完成後，分頁 3 辨識器將同步啟用 DTW 相似度評分。</div>
           <div style="border-top:1px solid var(--border);padding-top:10px;" class="space-y-sm">
             <div class="between">
-              <b style="font-size:12px;">多人聾人跨語者實驗結果</b>
+              <b style="font-size:12px;">多人聾人跨語者實驗與混淆表（Confusion Matrix）</b>
               <div class="row">
-                <button class="btn btn-sm" onclick="generateMultiSignerDemoCorpus()">＋ 模擬 3 位聾人 (D01~D03)</button>
-                <button id="btnExportLosoCsv" class="btn btn-sm" onclick="exportLosoReport()" disabled>匯出 CSV</button>
+                <button class="btn btn-sm" onclick="generateMultiSignerDemoCorpus()">＋ 模擬示範 3 人 (demo)</button>
+                <button id="btnExportLosoCsv" class="btn btn-sm" onclick="exportLosoReport()" disabled>匯出評測與混淆表 CSV</button>
               </div>
             </div>
-            <div id="losoResultBox" class="card muted" style="padding:10px;">需要至少 2 位以上不同語者編號（如 D01、D02、D03）即可執行跨語者留一驗證。</div>
+            <div id="losoResultBox" class="card muted" style="padding:10px;">需要至少 3 位真實語者（data_source=real 且 use_for_training=是）才可執行跨語者留一驗證。</div>
+            <div id="confusionMatrixBox" class="card hidden" style="padding:10px;overflow-x:auto;"></div>
           </div>
         </div>
       </div>
@@ -1106,21 +1121,74 @@
       return best;
     }
 
+    const SENTENCE_MAP = {
+      obj_apple: { id: 'S01', text: '蘋果放在桌子上' },
+      obj_watermelon: { id: 'S02', text: '西瓜放在桌子上' },
+      obj_clothes: { id: 'S03', text: '衣服放在桌子上' },
+      obj_cup: { id: 'S04', text: '杯子放在桌子上' },
+      obj_pen: { id: 'S05', text: '筆放在桌子上' },
+      obj_book: { id: 'S06', text: '書放在桌子上' },
+      obj_pineapple: { id: 'S07', text: '鳳梨放在桌子上' },
+      obj_newspaper: { id: 'S08', text: '報紙放在桌子上' },
+      obj_umbrella: { id: 'S09', text: '雨傘放在桌子上' }
+    };
+
+    function formatIsoTime(d = new Date()) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    // Item 1 & 11: Strict eligibility filter for training, consistency, and cross-signer evaluation
+    function isTrainableRealSample(s) {
+      if (!s || !s.frames || s.frames.length < 5) return false;
+      const ds = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
+      const rev = s.reviewStatus || '正常';
+      const consent = s.consentSigned || (ds === 'demo' ? '否' : '是');
+      const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && consent === '是') ? '是' : '否');
+      return ds === 'real' && rev === '正常' && consent === '是' && useTrain === '是' && (s.clipType || 'sentence') === 'sentence';
+    }
+
+    // Item 3: Pre-save consistency validator for contradictory labels/object_id/rule/clip_type
+    function validateSampleConsistency(label, objectId, ruleId, clipType) {
+      const issues = [];
+      const lbl = String(label || '').trim();
+      const obj = state.objects.find(o => o.id === objectId);
+      if (clipType === 'sentence') {
+        if (lbl && !lbl.includes('放') && !lbl.includes('桌') && !lbl.includes('上') && lbl.length <= 4) {
+          issues.push(`標註名稱「${lbl}」看起來是單詞，但語料類型卻選成「完整句子 (sentence)」`);
+        }
+        const mentioned = [...state.objects].sort((a, b) => b.name.length - a.name.length).find(o => lbl.includes(o.name));
+        if (mentioned && obj && mentioned.id !== obj.id) {
+          issues.push(`文字「${lbl}」提到的是「${mentioned.name}」，但對應物件卻選成「${obj.name}」`);
+        }
+      } else if (clipType === 'word_noun') {
+        if (lbl.includes('放在') || lbl.includes('桌子上')) {
+          issues.push(`文字「${lbl}」包含完整句子，但語料類型卻選成「單詞名詞」`);
+        }
+        const mentioned = [...state.objects].sort((a, b) => b.name.length - a.name.length).find(o => lbl.includes(o.name));
+        if (mentioned && obj && mentioned.id !== obj.id) {
+          issues.push(`文字「${lbl}」提到「${mentioned.name}」，但對應物件卻選成「${obj.name}」`);
+        }
+      }
+      if (obj && ruleId && obj.ruleId !== ruleId && clipType === 'sentence') {
+        issues.push(`物件「${obj.name}」的規則與所選規則不一致`);
+      }
+      return issues;
+    }
+
     function analyzeLandmarkSequence(frames, contextObjectId) {
-      if (!frames || frames.length < 5) return { isPut: false, sentence: '影格過少', trace: ['影格不足'] };
+      if (!frames || frames.length < 5) return { isPut: false, putStatus: '非放動作', observedDh: '', observedNdh: '非主手未偵測到', sentence: '影格過少', trace: ['影格不足'] };
       const trace = [];
       const ctxObj = state.objects.find(o => o.id === contextObjectId) || null;
       const tol = state.tolerance || { dyMin: 0.08, contactRatio: 0.25, normalizeScale: true };
       const realLive = frames.filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
       const sourceFrames = realLive.length >= 5 ? realLive : frames;
       const rawValid = sourceFrames.filter(f => f && f.dominant);
-      if (rawValid.length < 5) return { isPut: false, sentence: '未偵測到足夠主手影格', trace: ['主手影格不足'] };
+      if (rawValid.length < 5) return { isPut: false, putStatus: '非放動作', observedDh: '', observedNdh: '非主手未偵測到', sentence: '未偵測到足夠主手影格', trace: ['主手影格不足'] };
 
       // 0. Hand-over-Hand Occlusion Carry-Forward (非主手交叉遮擋記憶補強)
-      // When DH crosses in front of / lands on NDH during PUT co-articulation, 2D MediaPipe may temporarily lose NDH.
-      // Because NDH is spatially anchored as the table buoy (/ 手 /) in TSL PUT, carry forward the recent NDH anchor when DH is near it!
       let lastNdh = null, lastNdhIdx = -99, occludedCount = 0;
-      const occStart = Math.floor(rawValid.length * 0.35);
+      const occStart = Math.floor(rawValid.length * 0.30);
       const valid = rawValid.map((f, i) => {
         if (f.nonDominant) {
           lastNdh = f.nonDominant;
@@ -1141,8 +1209,8 @@
         trace.push(`🛡️ 交叉遮擋補強：偵測到 ${occludedCount} 幀雙手重疊遮擋副手，已由「非主手定格記憶」自動補全！`);
       }
 
-      // 1. Sliding Peak-to-Contact Window Detection using PALM CENTER (Landmark 9), not wrist!
-      const searchStart = Math.floor(valid.length * 0.25);
+      // 1. Order-Independent PUT Contact Search (scan from 15% to 100%, allowing PUT in middle OR end!)
+      const searchStart = Math.floor(valid.length * 0.15);
       let bestIdx = valid.length - 1;
       let bestDist = Infinity;
       let dualCount = 0;
@@ -1154,8 +1222,7 @@
         const dp = getPalmCenter(f.dominant);
         const np = getPalmCenter(f.nonDominant);
         const hx = Math.abs(dp.x - np.x);
-        const vy = np.y - dp.y; // > 0 when DH is above NDH, ~0 when stacked palm-on-palm
-        // Prefer PUT landing frames (only penalize palm-down Open B '桌子' pose; reward Open B table buoy on NDH!)
+        const vy = np.y - dp.y;
         const vertPenalty = vy < -0.08 ? Math.abs(vy + 0.08) * 2.5 : Math.abs(vy - 0.04);
         const isTablePose = (f.dominant.handshape === 'Open B' && f.dominant.palm === 'down');
         const palmPenalty = isTablePose ? 0.22 : (f.dominant.palm === 'up' || f.dominant.palm === 'in' ? 0 : 0.03);
@@ -1167,16 +1234,15 @@
         }
       }
 
-      const dualRatio = dualCount / Math.max(1, valid.length - searchStart);
-      // Local contact window around the detected landing frame (avoids penalizing earlier noun movements!)
       const winStart = Math.max(0, bestIdx - 6);
       const winEnd = Math.min(valid.length - 1, bestIdx + 5);
       const contactWin = valid.slice(winStart, winEnd + 1);
       const ndhWin = contactWin.filter(f => f.nonDominant);
 
-      // ① NDH stability & handshape inside contact window (median step resists end-of-clip hand drop!)
+      // ① NDH stability & handshape inside contact window (Item 5: explicitly separate NDH-missing vs not-PUT!)
       let ndhHoldScore = 0, ndhPalm = 'none', ndhShape = '無';
-      if (ndhWin.length >= 2) {
+      const ndhDetected = ndhWin.length >= 2;
+      if (ndhDetected) {
         const steps = [];
         for (let i = 1; i < ndhWin.length; i++) {
           const p0 = getPalmCenter(ndhWin[i - 1].nonDominant);
@@ -1189,17 +1255,18 @@
         ndhPalm = majorityVote(ndhWin.map(f => f.nonDominant.palm), ndhWin[ndhWin.length - 1].nonDominant.palm);
         ndhShape = majorityVote(ndhWin.map(f => f.nonDominant.handshape), 'Open B');
       }
-      trace.push(ndhWin.length >= 2
-        ? `① 非主手（接觸視窗 #${bestIdx + 1}）：${ndhShape}（掌心${ndhPalm === 'down' ? '朝下＝桌子' : ndhPalm === 'up' ? '朝上＝一般放底掌' : '朝側'}），穩定度 ${ndhHoldScore}%`
-        : '① 非主手：未偵測到雙手共構參照平面');
+      const observedNdh = ndhDetected ? `${ndhShape}_${ndhPalm}` : '非主手未偵測到';
+      trace.push(ndhDetected
+        ? `① 非主手（接觸視窗 #${bestIdx + 1}）：${formatHandshapeTag(ndhShape)}（掌心${ndhPalm === 'down' ? '朝下＝桌子' : ndhPalm === 'up' ? '朝上＝一般放底掌' : '朝側'}），穩定度 ${ndhHoldScore}%`
+        : '① 非主手未偵測到（骨架中非主手為空，與「沒有打放」分開標記）');
 
-      // ② DH handshape & palm orientation by majority vote around landing
+      // ② Observed DH handshape & palm orientation
       const dhShape = majorityVote(contactWin.map(f => f.dominant.handshape), valid[bestIdx].dominant.handshape);
       const dhPalm = majorityVote(contactWin.map(f => f.dominant.palm), valid[bestIdx].dominant.palm);
       const spec = HANDSHAPE_SPECS[dhShape] || HANDSHAPE_SPECS['Open O'];
-      trace.push(`② 主手手形：${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'} · ${spec.category}`);
+      trace.push(`② 實際主手手形：${formatHandshapeTag(dhShape)} (${dhShape}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'} · ${spec.category}`);
 
-      // ③ Peak-to-Contact downward placement trajectory & palm-center overlap
+      // ③ Peak-to-Contact downward trajectory & palm-center proximity
       const lookbackStart = Math.max(0, bestIdx - 32);
       let minDhY = 1.0;
       for (let i = lookbackStart; i <= bestIdx; i++) {
@@ -1210,7 +1277,6 @@
       const contactNdh = valid[bestIdx].nonDominant ? getPalmCenter(valid[bestIdx].nonDominant) : null;
       const peakDropDy = contactDh.y - minDhY;
 
-      // Landing deceleration check near contact frame
       const holdSlice = valid.slice(Math.max(0, bestIdx - 2), Math.min(valid.length, bestIdx + 5));
       let tailMove = 0;
       for (let i = 1; i < holdSlice.length; i++) {
@@ -1221,7 +1287,6 @@
       const avgTailMove = tailMove / Math.max(1, holdSlice.length - 1);
       const hasHold = avgTailMove < 0.036 * (1 + tol.contactRatio);
 
-      // Check palm-center proximity (wider vertical/horizontal clearance for big classifiers like Bent 5 watermelon & C cup!)
       const isClassifierShape = (dhShape !== 'Open B');
       let nearNdh = false, hx = 1, vy = 1;
       if (contactNdh) {
@@ -1232,7 +1297,6 @@
         nearNdh = hx < hxLim && vy >= -0.075 && vy <= vyLim;
       }
 
-      // Recognize simultaneous classifier PUT (Bent 5, C, 1, Open O, or flat / 手 / Open B with downward drop) and lexical 8-084 PUT
       const isLexicalStack = (ndhPalm === 'up' && dhPalm === 'up' && dhShape === 'Open B' && nearNdh && hx < 0.145 * (1 + tol.contactRatio));
       const isFlatPlanePut = (dhShape === 'Open B' && ndhPalm === 'down' && nearNdh && hx < 0.135 * (1 + tol.contactRatio) && peakDropDy >= tol.dyMin);
       const effectiveDyMin = isLexicalStack
@@ -1241,40 +1305,52 @@
       const hasDownward = peakDropDy >= effectiveDyMin;
 
       let trajScore = (hasDownward ? 45 : (isLexicalStack && nearNdh ? 35 : 0)) + (hasHold ? 25 : 0) + (nearNdh ? 30 : 0);
-      const minHold = Math.max(45, Math.round(68 - tol.contactRatio * 40));
+      // Item 5 HARD RULE: ndh_hold_pct MUST be >= 50% (never TRUE when ndh_hold_pct < 50!)
+      const minHold = Math.max(50, Math.round(68 - tol.contactRatio * 40));
       const validDhPalm = isClassifierShape ? true : (dhPalm === 'up' || (dhPalm === 'in' && ndhPalm === 'down') || isFlatPlanePut);
-      const isPut = (ndhWin.length >= 2) && (ndhHoldScore >= minHold) && nearNdh && (trajScore >= 75 || (isLexicalStack && hasHold)) && validDhPalm;
+      const isPut = ndhDetected && (ndhHoldScore >= minHold) && nearNdh && (trajScore >= 75 || (isLexicalStack && hasHold)) && validDhPalm;
+      const putStatus = !ndhDetected ? '非主手未偵測到' : (isPut ? '已驗證為放' : '非放動作');
 
       trace.push(isPut
-        ? `③ 軌跡與掌心接觸：掌心水平距 ${hx.toFixed(2)}、垂直高差 ${vy.toFixed(2)}、向下 Δy=+${peakDropDy.toFixed(2)}（門檻 ${effectiveDyMin.toFixed(2)}）→ 確認為「放」！`
-        : `③ 軌跡與掌心接觸：未達放置條件（手形 ${dhShape}/${dhPalm}，非主手穩 ${ndhHoldScore}%，hx=${hx.toFixed(2)}, vy=${vy.toFixed(2)}, Δy=${peakDropDy.toFixed(2)}）→ 非「放」動作`);
+        ? `③ 軌跡與掌心接觸：掌心水平距 ${hx.toFixed(2)}、垂直高差 ${vy.toFixed(2)}、向下 Δy=+${peakDropDy.toFixed(2)}、非主手穩 ${ndhHoldScore}%（≥${minHold}%）→ 確認為「放」！`
+        : `③ 軌跡驗證未通過（狀態：${putStatus}；非主手穩 ${ndhHoldScore}%，需 ≥${minHold}%；hx=${hx.toFixed(2)}, vy=${vy.toFixed(2)}, Δy=${peakDropDy.toFixed(2)}）`);
 
-      // 0. Optional Blind 3-Slot Word Lexicon Recognition on prefix BEFORE PUT contact window!
+      // Item 10: ORDER-INDEPENDENT 3-Component Detection across WHOLE clip (Object + Table + PUT in ANY order!)
       const blindMode = Boolean(document.getElementById('chkBlindMode')?.checked);
-      const wordNouns = state.samples.filter(s => s.clipType === 'word_noun' && s.frames?.length >= 4);
-      const wordLocs = state.samples.filter(s => s.clipType === 'word_loc' && s.frames?.length >= 4);
-      let blindNoun = null, blindLoc = null;
+      const wordNouns = state.samples.filter(s => s.clipType === 'word_noun' && s.frames?.length >= 4 && s.dataSource !== 'demo');
+      const wordLocs = state.samples.filter(s => s.clipType === 'word_loc' && s.frames?.length >= 4 && s.dataSource !== 'demo');
+      let blindNoun = null, blindLoc = null, nounSlot = -1, locSlot = -1;
 
       if (valid.length >= 12 && (wordNouns.length || wordLocs.length)) {
-        const preEnd = Math.max(6, bestIdx - 6);
-        const prefix = valid.slice(0, preEnd);
-        const segA = prefix.slice(0, Math.max(4, Math.floor(prefix.length * 0.58)));
-        const segB = prefix.slice(Math.max(0, Math.floor(prefix.length * 0.42)));
-
+        const windows = [
+          valid.slice(0, Math.max(5, Math.floor(valid.length * 0.45))),
+          valid.slice(Math.floor(valid.length * 0.25), Math.max(8, Math.floor(valid.length * 0.72))),
+          valid.slice(Math.floor(valid.length * 0.55))
+        ];
         if (wordNouns.length) {
-          const mA = matchWordLexicon(segA, wordNouns);
-          const mB = matchWordLexicon(segB, wordNouns);
-          blindNoun = (mA && (!mB || mA.distance <= mB.distance)) ? mA : mB;
+          windows.forEach((w, wi) => {
+            if (w.length < 4) return;
+            const m = matchWordLexicon(w, wordNouns);
+            if (m && (!blindNoun || m.distance < blindNoun.distance)) { blindNoun = m; nounSlot = wi; }
+          });
         }
         if (wordLocs.length) {
-          const lA = matchWordLexicon(segA, wordLocs);
-          const lB = matchWordLexicon(segB, wordLocs);
-          blindLoc = (lB && (!lA || lB.distance <= lA.distance)) ? lB : lA;
+          windows.forEach((w, wi) => {
+            if (w.length < 4) return;
+            const m = matchWordLexicon(w, wordLocs);
+            if (m && (!blindLoc || m.distance < blindLoc.distance)) { blindLoc = m; locSlot = wi; }
+          });
         }
-        if (blindNoun) trace.unshift(`🔍 盲測前段單詞庫辨識（結合姿勢＋雙手）：名詞「${blindNoun.word}」(相似度 ${blindNoun.similarity}%)${blindLoc ? ` ＋ 處所「${blindLoc.word}」(${blindLoc.similarity}%)` : ''}`);
+        if (blindNoun || blindLoc) {
+          trace.unshift(`🔍 不限語序三成分辨識：${blindNoun ? `物件「${blindNoun.word}」(區段${nounSlot+1}, ${blindNoun.similarity}%)` : '物件由代形詞推論'}${blindLoc ? ` · 處所「${blindLoc.word}」(區段${locSlot+1}, ${blindLoc.similarity}%)` : ' · 處所由非主手桌面判定'}`);
+        }
       } else if (blindMode) {
-        trace.unshift('💡 盲測提示：你尚未錄製「單詞教學（名詞／處所）」樣本；先到第 1 分頁錄製單字「西瓜／衣服／桌子」後，AI 即可完全免提示辨識前半句！');
+        trace.unshift('💡 不限語序盲測提示：先錄製真實單詞（名詞／桌子）樣本後，系統會自動跨全段獨立偵測「物件＋桌子＋放」三成分！');
       }
+
+      const detectedOrderType = (nounSlot >= 0 && locSlot >= 0)
+        ? (locSlot < nounSlot ? '背景先' : (nounSlot < locSlot ? '主體先' : '同時打出'))
+        : (ndhDetected && isPut ? '同時打出' : '');
 
       let matchedRule = null, matchedObj = (blindMode && blindNoun)
         ? (state.objects.find(o => o.id === blindNoun.objectId || o.name === blindNoun.word) || ctxObj)
@@ -1288,8 +1364,8 @@
           if (!matchedObj) matchedObj = state.objects.find(o => o.ruleId === matchedRule.id) || ctxObj || state.objects[2];
         } else {
           if (!matchedObj && dhShape === 'Open B' && ndhPalm === 'down') {
-            const preShapes = valid.slice(0, Math.max(4, bestIdx)).map(f => f.dominant.handshape).filter(sh => sh && sh !== 'Open B');
-            const preShape = majorityVote(preShapes, null);
+            const nonBShapes = valid.map(f => f.dominant.handshape).filter(sh => sh && sh !== 'Open B');
+            const preShape = majorityVote(nonBShapes, null);
             if (preShape) matchedObj = state.objects.find(o => o.handshape === preShape && o.ndhMode === 'Open B_down') || null;
           }
           if (!matchedObj) matchedObj = state.objects.find(o => o.handshape === dhShape && o.ndhMode === 'Open B_down') || ctxObj;
@@ -1298,23 +1374,28 @@
         ruleScore = 95;
         const nounName = blindNoun ? blindNoun.word : (matchedObj ? matchedObj.name : spec.category);
         sentence = `${nounName}放在${locName}上`;
-        const clInfo = matchedObj ? `（特徵：${matchedObj.shapeDesc || ''} · 代形詞：${matchedObj.classifierTag || dhShape}）` : '';
-        trace.push(`④ 規則驗證：命中【${matchedRule.code}：${matchedRule.name}】${clInfo} → 輸出句子：「${sentence}」`);
+        const clInfo = matchedObj ? `（特徵：${matchedObj.shapeDesc || ''} · 實際手形：${formatHandshapeTag(dhShape)}）` : '';
+        trace.push(`④ 三成分驗證（不限語序）：物件「${nounName}」＋ 處所「${locName}」＋ 放動作皆齊備${clInfo} → 句意：「${sentence}」`);
       } else {
-        const nounName = blindNoun ? blindNoun.word : (ctxObj ? ctxObj.name : dhShape);
-        sentence = `非「放」動作（僅偵測到 ${nounName}）`;
-        trace.push('⚠️ 未偵測到雙手掌心向下放置接觸，排除為非放置詞彙。');
+        const nounName = blindNoun ? blindNoun.word : (ctxObj ? ctxObj.name : formatHandshapeTag(dhShape));
+        sentence = putStatus === '非主手未偵測到'
+          ? `非主手未偵測到（主手偵測到 ${nounName}）`
+          : `非「放」動作（僅偵測到 ${nounName}）`;
+        trace.push(putStatus === '非主手未偵測到'
+          ? '⚠️ 非主手未入鏡或未被追蹤（與「沒有打放」區隔標記）。'
+          : '⚠️ 未偵測到雙手掌心向下放置接觸，排除為非放置詞彙。');
       }
       if (state.trainedModel && state.trainedModel.prototypes?.length) {
         const dtw = matchWithTrainedModel(frames);
-        if (dtw) trace.push(`⚡ 自學 DTW 模型：最接近「${dtw.label}」(${dtw.handshape})，時序相似度 ${dtw.similarity}%`);
+        if (dtw) trace.push(`⚡ 自學 DTW 模型：最接近「${dtw.label}」(${formatHandshapeTag(dtw.handshape)})，時序相似度 ${dtw.similarity}%`);
       }
       return {
-        isPut, sentence, ndhHoldScore,
-        ndhSummary: ndhWin.length >= 2 ? `${ndhShape} · 掌心${ndhPalm === 'down' ? '朝下(桌子)' : ndhPalm === 'up' ? '朝上(一般放)' : '朝側'}` : '無非主手參照',
-        dhShape, dhSummary: `${matchedObj?.classifierTag ? `${matchedObj.classifierTag} · ` : ''}${dhShape} (${spec.zh}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
+        isPut, putStatus, sentence, ndhHoldScore,
+        observedDh: dhShape, observedNdh, detectedOrderType,
+        ndhSummary: ndhDetected ? `${formatHandshapeTag(ndhShape)} · 掌心${ndhPalm === 'down' ? '朝下(桌子)' : ndhPalm === 'up' ? '朝上(一般放)' : '朝側'}` : '非主手未偵測到',
+        dhShape, dhSummary: `${formatHandshapeTag(dhShape)} (${dhShape}) · 掌心${dhPalm === 'up' ? '朝上' : dhPalm === 'down' ? '朝下' : '朝側'}`,
         shapeScore: 92, trajScore, trajSummary: isPut ? `掌心重疊接觸 · 向下 Δy=+${peakDropDy.toFixed(2)}` : `Δy=${peakDropDy.toFixed(2)} · 掌心距 ${hx.toFixed(2)}`,
-        ruleScore, ruleSummary: matchedRule ? `${matchedRule.code}：${matchedRule.name}` : '未觸發放規則', matchedRule, matchedObj, trace
+        ruleScore, ruleSummary: matchedRule ? `${matchedRule.code}：${matchedRule.name}` : putStatus, matchedRule, matchedObj, trace
       };
     }
 
@@ -1844,54 +1925,90 @@
       const clipType = document.getElementById('recClipType')?.value || 'sentence';
       const label = document.getElementById('recLabelInput').value.trim() || '未命名手語';
       const obj = state.objects.find(o => o.id === document.getElementById('recObjectSelect').value) || state.objects[0];
-      const signerId = (document.getElementById('recSignerId')?.value || 'D01').trim() || 'D01';
-      const dhShape = document.getElementById('recDhShape').value;
+      const signerId = (document.getElementById('recSignerId')?.value || '').trim();
+      if (!signerId || /[\u4e00-\u9fff]/.test(signerId)) {
+        alert('為了隱私保護，語者編號請勿填寫中文真實姓名！請改填英文加數字的匿名代號（如 D01、D02）。');
+        return;
+      }
+
+      // Item 3: Pre-save consistency guard
+      const issues = validateSampleConsistency(label, obj?.id, obj?.ruleId, clipType);
+      let reviewStatus = '正常';
+      if (issues.length) {
+        const proceed = confirm(`⚠️ 偵測到標註矛盾：\n• ${issues.join('\n• ')}\n\n按「取消」回去修正；按「確定」將標記為「待人工確認」且不納入訓練。`);
+        if (!proceed) return;
+        reviewStatus = '待人工確認';
+      }
+
+      const dataSource = state.recSource === 'camera' ? 'real' : 'demo';
+      const consentSigned = (dataSource === 'real' && document.getElementById('chkConsentSigned')?.checked) ? '是' : '否';
+      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是') ? '是' : '否';
+      const expectedDhShape = document.getElementById('recDhShape').value;
+      const expectedNdhMode = document.getElementById('recNdhMode').value;
+      const analysis = state.lastLandmarks.length >= 5 ? analyzeLandmarkSequence(state.lastLandmarks, obj?.id) : null;
       const objectFeature = clipType === 'word_handshape' ? '手形教學示範' : (obj?.shapeDesc || '');
-      const classifierTag = clipType === 'word_handshape' ? formatHandshapeTag(dhShape) : (obj?.classifierTag || formatHandshapeTag(dhShape));
-      const nowStr = new Date().toLocaleString('zh-TW', { hour12: false });
+      const classifierTag = clipType === 'word_handshape' ? formatHandshapeTag(expectedDhShape) : (obj?.classifierTag || formatHandshapeTag(expectedDhShape));
+      const nowIso = formatIsoTime(new Date());
+      const sentenceId = clipType === 'sentence' ? (SENTENCE_MAP[obj?.id]?.id || '') : '';
+      const sourceFile = dataSource === 'real' ? 'webcam_admin' : 'simulated_demo';
+      const sourceNote = dataSource === 'real' ? '管理員鏡頭錄製' : '示範模擬串流';
 
       if (state.overwriteSampleId) {
         const idx = state.samples.findIndex(x => x.id === state.overwriteSampleId);
         if (idx !== -1) {
           const updated = {
-            ...state.samples[idx], clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+            ...state.samples[idx], dataSource, clipType, sentenceId, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
             objectFeature, classifierTag,
-            dhShape, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+            dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '',
+            dhPalm: obj?.palm || 'up',
+            ndhMode: expectedNdhMode, expectedNdhMode, observedNdhMode: analysis?.observedNdh || '',
+            putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+            reviewStatus, consentSigned, useForTraining,
+            sourceFile, sourceNote: `已重錄覆蓋 (${sourceNote})`, createdAt: nowIso,
             handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
-            frameCount: state.lastLandmarks.length, createdAt: `已重錄覆蓋 ${nowStr}`, frames: state.lastLandmarks
+            frameCount: state.lastLandmarks.length, frames: state.lastLandmarks
           };
           state.samples[idx] = updated; await idbPut('samples', updated);
           state.overwriteSampleId = null;
           document.getElementById('overwriteBanner').classList.add('hidden');
           document.getElementById('btnSaveSample').textContent = '存入資料庫';
           renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
-          document.getElementById('recMessage').textContent = `✅ 已重錄覆蓋「${label}」（語者 ${signerId}）！`;
-          if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(updated, state.lastVideoBlob);
+          document.getElementById('recMessage').textContent = `✅ 已重錄覆蓋「${label}」（${dataSource === 'demo' ? 'demo 不上傳雲端' : `語者 ${signerId}`}）！`;
+          if (dataSource === 'real' && document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(updated, state.lastVideoBlob);
           return;
         }
       }
 
       const smp = {
-        id: 'smp_' + Date.now(), clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+        id: (dataSource === 'demo' ? 'demo_sim_' : 'smp_') + Date.now(),
+        dataSource, clipType, sentenceId, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
         objectFeature, classifierTag,
-        dhShape, dhPalm: 'up', ndhMode: document.getElementById('recNdhMode').value,
+        dhShape: expectedDhShape, expectedDhShape, observedDhShape: analysis?.observedDh || '',
+        dhPalm: obj?.palm || 'up', dhAperture: '', intendedSize: '',
+        ndhMode: expectedNdhMode, expectedNdhMode, observedNdhMode: analysis?.observedNdh || '',
+        putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+        actualOrder: '', orderType: analysis?.detectedOrderType || '', referentMentionedBefore: '',
+        reviewStatus, consentSigned, useForTraining,
+        sourceFile, sourceNote, createdAt: nowIso,
         handedness: state.handedness, fps: Number(document.getElementById('recFpsSelect').value) || 15,
-        frameCount: state.lastLandmarks.length, createdAt: nowStr, frames: state.lastLandmarks
+        frameCount: state.lastLandmarks.length, frames: state.lastLandmarks
       };
       state.samples.unshift(smp); await idbPut('samples', smp);
       renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
-      const typeLabel = clipType === 'word_handshape' ? `🖐️ 手形教學 ${formatHandshapeTag(dhShape)}` : (clipType === 'word_noun' ? '單詞（名詞）' : (clipType === 'word_loc' ? '單詞（處所）' : '完整句子'));
-      document.getElementById('recMessage').textContent = clipType === 'word_handshape'
-        ? `✅ AI 已學習手形 ${formatHandshapeTag(dhShape)}！（語者 ${signerId} · ${state.lastLandmarks.length}f，現在鏡頭與影片即可自動辨識此手形！）`
-        : `✅ 已存入本機資料庫：「${label}」（${typeLabel} · 語者 ${signerId}）`;
-      if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(smp, state.lastVideoBlob);
+      const typeLabel = clipType === 'word_handshape' ? `🖐️ 手形教學 ${formatHandshapeTag(expectedDhShape)}` : (clipType === 'word_noun' ? '單詞（名詞）' : (clipType === 'word_loc' ? '單詞（處所）' : '完整句子'));
+      document.getElementById('recMessage').textContent = dataSource === 'demo'
+        ? `ℹ️ 已將「${label}」標記為 demo 範例（不納入訓練、不同步至真實試算表）。`
+        : (clipType === 'word_handshape'
+          ? `✅ AI 已學習手形 ${formatHandshapeTag(expectedDhShape)}！（語者 ${signerId} · ${state.lastLandmarks.length}f）`
+          : `✅ 已存入本機：「${label}」（${typeLabel} · 語者 ${signerId} · 狀態 ${reviewStatus}）`);
+      if (dataSource === 'real' && document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(smp, state.lastVideoBlob);
     }
 
     function triggerDownload(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
     function downloadLastVideo() { if (state.lastVideoBlob) triggerDownload(state.lastVideoBlob, `${document.getElementById('recLabelInput').value || 'tsl'}.webm`); }
     function exportCurrentLandmark(fmt) { if (state.lastLandmarks.length) exportFramesAs(state.lastLandmarks, document.getElementById('recLabelInput').value || 'tsl', fmt); }
     function exportFramesAs(frames, base, fmt) {
-      if (fmt === 'json') triggerDownload(new Blob([JSON.stringify({ schema: 'tsl-put-v1', clipName: base, frames }, null, 2)], { type: 'application/json' }), `${base}.json`);
+      if (fmt === 'json') triggerDownload(new Blob([JSON.stringify({ schema: 'tsl-put-v2', clipName: base, frames }, null, 2)], { type: 'application/json' }), `${base}.json`);
       else if (fmt === 'jsonl') triggerDownload(new Blob([frames.map(f => JSON.stringify(f)).join('\n')], { type: 'application/x-ndjson' }), `${base}.jsonl`);
       else {
         const rows = ['frame_index,timestamp_ms,dh_shape,dh_palm,dh_x,dh_y,ndh_shape,ndh_palm,ndh_x,ndh_y', ...frames.map(f => [f.frameIndex, f.timestampMs, f.dominant?.handshape||'', f.dominant?.palm||'', f.dominant?.wrist?.x?.toFixed(4)||'', f.dominant?.wrist?.y?.toFixed(4)||'', f.nonDominant?.handshape||'', f.nonDominant?.palm||'', f.nonDominant?.wrist?.x?.toFixed(4)||'', f.nonDominant?.wrist?.y?.toFixed(4)||''].join(','))];
@@ -1907,7 +2024,7 @@
           state.rules = parsed.rules; state.objects = parsed.objects; state.samples = parsed.samples;
           await persistConfig(); for (const s of state.samples) await idbPut('samples', s); renderAll();
         } else if (Array.isArray(parsed.frames)) {
-          const smp = { id: 'imp_' + Date.now(), label: parsed.clipName || f.name, signerId: 'IMP', objectId: state.objects[0].id, ruleId: state.objects[0].ruleId, dhShape: 'Open O', dhPalm: 'up', ndhMode: 'Open B_down', frameCount: parsed.frames.length, createdAt: '匯入資料', frames: parsed.frames };
+          const smp = { id: 'imp_' + Date.now(), dataSource: 'real', clipType: 'sentence', label: parsed.clipName || f.name, signerId: 'IMP', objectId: state.objects[0].id, ruleId: state.objects[0].ruleId, dhShape: 'Open O', expectedDhShape: 'Open O', observedDhShape: '', dhPalm: 'up', ndhMode: 'Open B_down', expectedNdhMode: 'Open B_down', observedNdhMode: '', reviewStatus: '待人工確認', consentSigned: '否', useForTraining: '否', sourceFile: f.name, sourceNote: '手動匯入JSON', frameCount: parsed.frames.length, createdAt: formatIsoTime(new Date()), frames: parsed.frames };
           state.samples.unshift(smp); await idbPut('samples', smp); renderAll();
         }
       } catch (err) { document.getElementById('recMessage').textContent = '匯入失敗：' + err.message; }
@@ -1916,9 +2033,16 @@
 
     async function seedDemoSamples() {
       state.samples = state.objects.map(o => ({
-        id: 'demo_' + o.id, label: `${o.name}放在桌子上`, signerId: 'D01', objectId: o.id, ruleId: o.ruleId,
-        dhShape: o.handshape, dhPalm: o.palm, ndhMode: o.ndhMode, frameCount: 38, createdAt: '內建標準範例',
-        frames: synthesizeSequence({ objectId: o.id }, 15, 2.5)
+        id: 'demo_' + o.id, dataSource: 'demo', clipType: 'sentence',
+        sentenceId: SENTENCE_MAP[o.id]?.id || '', label: `${o.name}放在桌子上`,
+        signerId: 'DEMO', objectId: o.id, ruleId: o.ruleId,
+        objectFeature: o.shapeDesc || '', classifierTag: o.classifierTag || '',
+        dhShape: o.handshape, expectedDhShape: o.handshape, observedDhShape: o.handshape,
+        dhPalm: o.palm, dhAperture: '', intendedSize: '',
+        ndhMode: o.ndhMode, expectedNdhMode: o.ndhMode, observedNdhMode: o.ndhMode,
+        putStatus: '已驗證為放', reviewStatus: '正常', consentSigned: '否', useForTraining: '否',
+        sourceFile: 'builtin_demo', sourceNote: '內建標準範例', createdAt: '',
+        fps: 15, frameCount: 38, frames: synthesizeSequence({ objectId: o.id }, 15, 2.5)
       }));
       for (const s of state.samples) await idbPut('samples', s);
     }
@@ -1927,24 +2051,50 @@
     function toggleEditSample(id) { state.editingSampleId = (state.editingSampleId === id) ? null : id; renderSampleList(); }
     async function saveEditedSample(id) {
       const idx = state.samples.findIndex(x => x.id === id); if (idx === -1) return;
-      const newLabel = document.getElementById(`editLabel_${id}`)?.value.trim() || state.samples[idx].label;
+      const prev = state.samples[idx];
+      const newLabel = document.getElementById(`editLabel_${id}`)?.value.trim() || prev.label;
       const newSigner = document.getElementById(`editSigner_${id}`)?.value.trim() || 'D01';
-      const newShape = document.getElementById(`editShape_${id}`)?.value || state.samples[idx].dhShape;
-      const newObjId = document.getElementById(`editObj_${id}`)?.value || state.samples[idx].objectId;
+      if (/[\u4e00-\u9fff]/.test(newSigner)) {
+        alert('語者代號請勿使用真實姓名，請改填匿名代號（如 D01、D02）。');
+        return;
+      }
+      const newObjId = document.getElementById(`editObj_${id}`)?.value || prev.objectId;
       const obj = state.objects.find(o => o.id === newObjId);
+      const newExpectedShape = obj ? obj.handshape : (prev.expectedDhShape || prev.dhShape);
+      const newObservedShape = document.getElementById(`editObsShape_${id}`)?.value ?? (prev.observedDhShape || '');
+      const newObservedNdh = document.getElementById(`editObsNdh_${id}`)?.value ?? (prev.observedNdhMode || '');
+      const newAperture = document.getElementById(`editAperture_${id}`)?.value ?? '';
+      const newIntendedSize = document.getElementById(`editSize_${id}`)?.value ?? '';
+      const newActualOrder = document.getElementById(`editOrder_${id}`)?.value.trim() ?? '';
+      const newOrderType = document.getElementById(`editOrderType_${id}`)?.value ?? '';
+      const newRefBefore = document.getElementById(`editRefBefore_${id}`)?.value ?? '';
+      const newReview = document.getElementById(`editReview_${id}`)?.value || '正常';
+      const newConsent = document.getElementById(`editConsent_${id}`)?.value || '否';
+      let newUseTrain = document.getElementById(`editUseTrain_${id}`)?.value || '否';
+      const dataSource = prev.dataSource || (String(prev.id).startsWith('demo_') ? 'demo' : 'real');
+      // Enforce Item 1 & 11 invariant: demo / duplicate / 待人工確認 / unsigned consent CANNOT be used for training
+      if (dataSource !== 'real' || newReview !== '正常' || newConsent !== '是') newUseTrain = '否';
+
       const updated = {
-        ...state.samples[idx],
-        label: newLabel,
-        signerId: newSigner,
-        dhShape: newShape,
+        ...prev,
+        label: newLabel, signerId: newSigner, dataSource,
         objectId: newObjId,
-        objectFeature: obj ? obj.shapeDesc : (state.samples[idx].objectFeature || ''),
-        classifierTag: obj ? obj.classifierTag : (state.samples[idx].classifierTag || ''),
-        ruleId: obj ? obj.ruleId : state.samples[idx].ruleId
+        sentenceId: (prev.clipType || 'sentence') === 'sentence' ? (SENTENCE_MAP[newObjId]?.id || prev.sentenceId || '') : '',
+        objectFeature: obj ? obj.shapeDesc : (prev.objectFeature || ''),
+        classifierTag: obj ? obj.classifierTag : (prev.classifierTag || ''),
+        ruleId: obj ? obj.ruleId : prev.ruleId,
+        dhShape: newExpectedShape, expectedDhShape: newExpectedShape,
+        observedDhShape: newObservedShape,
+        expectedNdhMode: obj ? obj.ndhMode : (prev.expectedNdhMode || prev.ndhMode || ''),
+        observedNdhMode: newObservedNdh,
+        dhAperture: newAperture, intendedSize: newIntendedSize,
+        actualOrder: newActualOrder, orderType: newOrderType, referentMentionedBefore: newRefBefore,
+        reviewStatus: newReview, consentSigned: newConsent, useForTraining: newUseTrain
       };
       state.samples[idx] = updated; await idbPut('samples', updated);
       state.editingSampleId = null; renderSampleList(); refreshRecognizerSelects();
-      document.getElementById('recMessage').textContent = `✅ 已更新「${newLabel}」（語者 ${newSigner}）`;
+      document.getElementById('recMessage').textContent = `✅ 已更新「${newLabel}」（代號 ${newSigner} · 訓練資格：${newUseTrain}）`;
+      if (dataSource === 'real' && document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) syncUploadSampleToGs(updated, null);
     }
 
     async function deleteSample(id) {
@@ -1999,7 +2149,8 @@
 
     function renderSampleList() {
       rebuildHandshapePrototypes();
-      document.getElementById('sampleCountPill').textContent = `${state.samples.length} 筆`;
+      const realTrainableCount = state.samples.filter(isTrainableRealSample).length;
+      document.getElementById('sampleCountPill').textContent = `${state.samples.length} 筆（可訓真實 ${realTrainableCount}）`;
       document.getElementById('statSamples').textContent = state.samples.length;
       document.getElementById('statRules').textContent = state.rules.length;
       document.getElementById('statObjects').textContent = state.objects.length;
@@ -2008,37 +2159,69 @@
         const obj = state.objects.find(o => o.id === s.objectId);
         const feat = (s.objectFeature || obj?.shapeDesc || '').toLowerCase();
         const tag = (s.classifierTag || obj?.classifierTag || '').toLowerCase();
-        return (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q) || feat.includes(q) || tag.includes(q);
+        const rev = (s.reviewStatus || '').toLowerCase();
+        const ds = (s.dataSource || '').toLowerCase();
+        return (s.label||'').toLowerCase().includes(q) || (s.signerId||'').toLowerCase().includes(q) || (s.dhShape||'').toLowerCase().includes(q) || feat.includes(q) || tag.includes(q) || rev.includes(q) || ds.includes(q);
       }) : state.samples;
+      const mkOpts = (arr, cur) => arr.map(([v, lbl]) => `<option value="${v}" ${v === (cur || '') ? 'selected' : ''}>${lbl}</option>`).join('');
       document.getElementById('sampleListContainer').innerHTML = list.map(s => {
         const obj = state.objects.find(o => o.id === s.objectId);
         const r = state.rules.find(x => x.id === (s.ruleId || obj?.ruleId));
         const sid = s.signerId || 'D01';
-        const feat = s.objectFeature || obj?.shapeDesc || '';
-        const clTag = s.clipType === 'word_handshape' ? formatHandshapeTag(s.dhShape) : (s.classifierTag || obj?.classifierTag || formatHandshapeTag(s.dhShape));
+        const ds = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
+        const rev = s.reviewStatus || '正常';
+        const consent = s.consentSigned || (ds === 'demo' ? '否' : '是');
+        const useTrain = s.useForTraining || ((ds === 'real' && rev === '正常' && consent === '是') ? '是' : '否');
+        const expSh = s.expectedDhShape || s.dhShape || '';
+        const obsSh = s.observedDhShape || '';
         const isEd = state.editingSampleId === s.id, isOv = state.overwriteSampleId === s.id;
-        const typeBadge = s.clipType === 'word_handshape' ? '🖐️ 手形教學' : (s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (r ? r.code : '句子')));
+        const typeBadge = s.clipType === 'word_handshape' ? '🖐️ 手形教學' : (s.clipType === 'word_noun' ? '單詞：名詞' : (s.clipType === 'word_loc' ? '單詞：處所' : (s.sentenceId || (r ? r.code : '句子'))));
+        const statusPills = [
+          ds === 'demo' ? '<span class="pill" style="color:var(--muted);">demo</span>' : '<span class="pill" style="color:var(--sage);border-color:var(--sage);">real</span>',
+          rev === '待人工確認' ? '<span class="pill" style="color:var(--warn);border-color:var(--warn);">⚠️ 待人工確認</span>' : '',
+          rev === 'duplicate' ? '<span class="pill" style="color:var(--primary);border-color:var(--primary);">duplicate</span>' : '',
+          s.putStatus === '非主手未偵測到' ? '<span class="pill" style="color:var(--warn);">非主手未偵測到</span>' : ''
+        ].filter(Boolean).join(' ');
         return `<div class="subcard space-y-sm" style="${isOv ? 'border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);' : ''}">
           <div class="between">
-            <div><b>${s.label}</b> ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}<div class="muted">語者 <b>${sid}</b>${feat ? ` · 特徵：${feat}` : ''} · 代形詞／手形：<b>${clTag}</b> · ${s.frameCount}f</div></div>
+            <div>
+              <b>${s.label}</b> ${statusPills} ${isOv ? '<span class="pill" style="background:var(--primary);color:#fff;border-color:var(--primary);">重錄覆蓋中</span>' : ''}
+              <div class="muted">代號 <b>${sid}</b> · 預期 ${formatHandshapeTag(expSh)}${obsSh ? ` / 實際 <b>${formatHandshapeTag(obsSh)}</b>` : ''} · 訓練:${useTrain} · ${s.frameCount}f</div>
+            </div>
             <span class="pill">${typeBadge}</span>
           </div>
-          ${isEd ? `<div class="card space-y-sm" style="padding:10px;">
+          ${isEd ? `<div class="card space-y-sm" style="padding:10px;font-size:12px;">
             <div class="grid-2">
-              <div><label class="field-label">修改文字名稱</label><input id="editLabel_${s.id}" type="text" value="${s.label}" /></div>
-              <div><label class="field-label">語者編號</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
+              <div><label class="field-label">句型／單詞名稱</label><input id="editLabel_${s.id}" type="text" value="${s.label}" /></div>
+              <div><label class="field-label">語者匿名代號（勿填真名）</label><input id="editSigner_${s.id}" type="text" value="${sid}" /></div>
             </div>
             <div class="grid-2">
-              <div><label class="field-label">關聯物件與代形詞</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || formatHandshapeTag(o.handshape)}）</option>`).join('')}</select></div>
-              <div><label class="field-label">預期主手手形</label><select id="editShape_${s.id}">${HANDSHAPE_ORDER.map(sh => `<option value="${sh}" ${sh===s.dhShape?'selected':''}>${formatHandshapeTag(sh)}</option>`).join('')}</select></div>
+              <div><label class="field-label">關聯物件（自動填預期手形）</label><select id="editObj_${s.id}">${state.objects.map(o => `<option value="${o.id}" ${o.id===s.objectId?'selected':''}>${o.name}（${o.shapeDesc || ''} · ${o.classifierTag || formatHandshapeTag(o.handshape)}）</option>`).join('')}</select></div>
+              <div><label class="field-label">實際觀察主手手形 (observed)</label><select id="editObsShape_${s.id}">${mkOpts([['','（自動/未填）'], ...HANDSHAPE_ORDER.map(sh => [sh, formatHandshapeTag(sh)]), ['其他','其他變體']], obsSh)}</select></div>
             </div>
-            <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存修改</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
+            <div class="grid-3">
+              <div><label class="field-label">手形張開程度</label><select id="editAperture_${s.id}">${mkOpts([['','未填'],['全開','全開'],['微開','微開'],['半閉','半閉'],['閉合','閉合']], s.dhAperture)}</select></div>
+              <div><label class="field-label">想表示的大小</label><select id="editSize_${s.id}">${mkOpts([['','未填'],['一般大小','一般大小'],['特別大','特別大'],['特別小','特別小'],['不確定','不確定']], s.intendedSize)}</select></div>
+              <div><label class="field-label">實際非主手狀態</label><select id="editObsNdh_${s.id}">${mkOpts([['','自動'],['Open B_down','/ 手 / 朝下(桌子)'],['Open B_up','/ 手 / 朝上(一般放)'],['其他','其他手形'],['非主手未偵測到','非主手未偵測到']], s.observedNdhMode)}</select></div>
+            </div>
+            <div class="grid-3">
+              <div><label class="field-label">實際語序（如 蘋果／放／桌子上）</label><input id="editOrder_${s.id}" type="text" value="${s.actualOrder || ''}" placeholder="蘋果／放／桌子上" /></div>
+              <div><label class="field-label">語序類型</label><select id="editOrderType_${s.id}">${mkOpts([['','未填'],['背景先','背景先'],['主體先','主體先'],['同時打出','同時打出'],['其他','其他']], s.orderType)}</select></div>
+              <div><label class="field-label">前文曾提過指涉物</label><select id="editRefBefore_${s.id}">${mkOpts([['','未填'],['有','有'],['沒有','沒有'],['不確定','不確定']], s.referentMentionedBefore)}</select></div>
+            </div>
+            <div class="grid-3">
+              <div><label class="field-label">審核狀態</label><select id="editReview_${s.id}">${mkOpts([['正常','正常'],['待人工確認','待人工確認'],['duplicate','duplicate']], rev)}</select></div>
+              <div><label class="field-label">已簽知情同意書</label><select id="editConsent_${s.id}">${mkOpts([['是','是'],['否','否']], consent)}</select></div>
+              <div><label class="field-label">納入模型訓練</label><select id="editUseTrain_${s.id}">${mkOpts([['是','是'],['否','否']], useTrain)}</select></div>
+            </div>
+            <div class="row"><button class="btn btn-primary btn-sm" onclick="saveEditedSample('${s.id}')">儲存標註</button><button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">取消</button></div>
           </div>` : ''}
           <div class="row">
-            <button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">✏️ 編輯</button>
+            <button class="btn btn-sm" onclick="toggleEditSample('${s.id}')">✏️ 標註／編輯</button>
             <button class="btn btn-sm" onclick="startOverwriteSample('${s.id}')">🔄 重錄覆蓋</button>
             <button class="btn btn-sm" onclick="sendSampleToRecognizer('${s.id}')">AI 辨識</button>
             ${s.videoUrl ? `<a class="btn btn-sm" href="${s.videoUrl}" target="_blank" style="text-decoration:none;color:var(--sage);">🎬 硬碟影片</a>` : ''}
+            ${s.landmarksFileUrl ? `<a class="btn btn-sm" href="${s.landmarksFileUrl}" target="_blank" style="text-decoration:none;color:var(--muted);">📦 完整骨架</a>` : ''}
             <button class="btn btn-sm" style="margin-left:auto;" onclick="deleteSample('${s.id}')">🗑️ 刪除</button>
           </div>
         </div>`;
@@ -2061,7 +2244,40 @@
       const semanticFocus = document.getElementById('objSemanticFocus')?.value.trim() || `依 ${rule?.code||'規則'} 選用`;
       const o = { id: 'obj_' + Date.now(), name, shapeDesc: document.getElementById('objShapeDesc').value.trim() || '自訂物體特徵', classifierTag, semanticFocus, lexicalGloss: document.getElementById('objLexicalGloss').value.trim() || name, ruleId, handshape, palm: document.getElementById('objPalm').value, ndhMode: rule?.coMode === 'lexical_put' ? 'Open B_up' : 'Open B_down', note: semanticFocus };
       state.objects.push(o); await persistConfig();
-      const smp = { id: 'smp_' + o.id, label: `${o.name}放在桌子上`, objectId: o.id, ruleId: o.ruleId, dhShape: o.handshape, dhPalm: o.palm, ndhMode: o.ndhMode, frameCount: 38, createdAt: '自動建立', frames: synthesizeSequence({ objectId: o.id }, 15, 2.5) };
+      const smp = {
+        id: 'demo_auto_' + o.id,
+        label: `${o.name}放在桌子上`,
+        clipType: 'sentence',
+        sentenceId: '',
+        objectId: o.id,
+        ruleId: o.ruleId,
+        expectedDhShape: o.handshape,
+        observedDhShape: o.handshape,
+        dhShape: o.handshape,
+        dhAperture: '',
+        intendedSize: '',
+        dhPalm: o.palm,
+        expectedNdhMode: o.ndhMode,
+        observedNdhMode: o.ndhMode,
+        ndhMode: o.ndhMode,
+        signerId: 'DEMO_AUTO',
+        signerRole: 'demo_synthetic',
+        handedness: 'right',
+        fps: 15,
+        sourceFile: 'synthetic_demo',
+        dataSource: 'demo',
+        reviewStatus: '正常',
+        useForTraining: '否',
+        consentSigned: '否',
+        putStatus: '已驗證為放',
+        actualOrder: '',
+        orderType: '',
+        referentMentionedBefore: '',
+        createdAt: '',
+        sourceNote: '新增辭典物件自動產生的示範預覽（demo，不列入真實訓練）',
+        frameCount: 38,
+        frames: synthesizeSequence({ objectId: o.id }, 15, 2.5)
+      };
       state.samples.unshift(smp); await idbPut('samples', smp); toggleNewObjectForm(); renderAll();
     }
     async function deleteObject(id) { if (state.objects.length <= 1) return; state.objects = state.objects.filter(o => o.id !== id); await persistConfig(); renderAll(); }
@@ -2430,29 +2646,65 @@
       return { prototypes, learnedDy };
     }
 
+    function renderConfusionMatrix(pairs, title = '混淆表（列＝實際句意 · 欄＝模型預測）') {
+      const box = document.getElementById('confusionMatrixBox');
+      if (!box) return null;
+      if (!pairs.length) { box.classList.add('hidden'); return null; }
+      const labels = [...new Set(pairs.flatMap(p => [p.actual, p.pred]))].sort();
+      const mat = {};
+      labels.forEach(a => { mat[a] = {}; labels.forEach(b => { mat[a][b] = 0; }); });
+      pairs.forEach(p => { mat[p.actual][p.pred]++; });
+      box.classList.remove('hidden');
+      box.innerHTML = `<div style="font-size:12px;font-weight:700;margin-bottom:6px;">${title}</div>
+        <table style="font-size:11px;width:100%;">
+          <thead><tr><th>實際 \\ 預測</th>${labels.map(l => `<th>${l.replace('放在桌子上','')}</th>`).join('')}</tr></thead>
+          <tbody>${labels.map(a => `<tr><td><b>${a.replace('放在桌子上','')}</b></td>${labels.map(b => {
+            const v = mat[a][b];
+            const bg = v > 0 ? (a === b ? 'background:#e5f5f0;color:#247a68;font-weight:700;' : 'background:#fdecea;color:#c95238;font-weight:700;') : 'color:var(--muted);';
+            return `<td style="text-align:center;${bg}">${v}</td>`;
+          }).join('')}</tr>`).join('')}</tbody>
+        </table>`;
+      return { labels, mat };
+    }
+
     async function trainSelfLearningModel() {
-      if (!state.samples.length) return;
-      const { prototypes, learnedDy } = buildPrototypesFromSamples(state.samples);
-      const signers = new Set(state.samples.map(s => s.signerId || 'D01'));
+      const eligible = state.samples.filter(isTrainableRealSample);
+      if (!eligible.length) {
+        document.getElementById('mlTrainCount').textContent = '0 / 0人';
+        document.getElementById('mlTrainAcc').textContent = '—';
+        document.getElementById('mlPrototypeReport').innerHTML = '<b style="color:var(--warn);">目前沒有符合訓練資格的真實語料</b>（已自動排除 demo、duplicate、待人工確認與未簽同意書樣本）。';
+        document.getElementById('confusionMatrixBox')?.classList.add('hidden');
+        return;
+      }
+      const { prototypes, learnedDy } = buildPrototypesFromSamples(eligible);
+      const signers = new Set(eligible.map(s => s.signerId || 'D01'));
       let correct = 0;
-      for (const smp of state.samples) {
+      const pairs = [];
+      for (const smp of eligible) {
         const seq = extractNormalizedSequence(smp.frames, 18);
         let best = null, bestDist = Infinity;
         for (const p of prototypes) { const d = dtwDistance(seq, p.centroid); if (d < bestDist) { bestDist = d; best = p; } }
-        if (best && (best.key === (smp.objectId || smp.dhShape) || best.handshape === smp.dhShape)) correct++;
+        const actualLabel = smp.label || smp.objectId;
+        const predLabel = best ? best.label : '未匹配';
+        pairs.push({ actual: actualLabel, pred: predLabel });
+        if (best && (best.key === (smp.objectId || smp.dhShape) || best.label === actualLabel)) correct++;
       }
-      const acc = Math.round((correct / state.samples.length) * 100);
-      state.trainedModel = { trainedAt: new Date().toLocaleTimeString('zh-TW', { hour12: false }), sampleCount: state.samples.length, signerCount: signers.size, accuracy: acc, learnedDy, prototypes };
+      const acc = Math.round((correct / eligible.length) * 100);
+      const metricName = signers.size <= 1 ? '單一語者內部一致率' : `訓練集內部一致率 (${signers.size}人)`;
+      const accLblEl = document.getElementById('mlTrainAccLabel');
+      if (accLblEl) accLblEl.textContent = metricName;
+      const cm = renderConfusionMatrix(pairs, `內部一致率混淆表（${eligible.length} 筆真實可訓樣本 · 列＝實際 · 欄＝預測）`);
+      state.trainedModel = { trainedAt: formatIsoTime(new Date()), sampleCount: eligible.length, signerCount: signers.size, accuracy: acc, metricName, learnedDy, prototypes, confusionMatrix: cm };
       await idbPut('config', { key: 'trainedModel', data: state.trainedModel });
-      await appendLearningLog(`⚡ DTW 自主訓練完成：${state.samples.length} 筆樣本（${signers.size} 位語者）、${prototypes.length} 個手語原型，一致率 ${acc}%`);
+      await appendLearningLog(`⚡ DTW 自主訓練完成：採計 ${eligible.length} 筆真實可訓樣本（${signers.size} 位語者，已排除 demo/duplicate/待審），${metricName} ${acc}%`);
       renderLearnTab();
     }
 
     async function generateMultiSignerDemoCorpus() {
       const profiles = [
-        { id: 'D01', scale: 0.94, yShift: -0.02, speedMul: 0.92, note: '手掌較小、動作偏快' },
-        { id: 'D02', scale: 1.05, yShift:  0.00, speedMul: 1.00, note: '標準體型、自然語速' },
-        { id: 'D03', scale: 1.14, yShift:  0.03, speedMul: 1.15, note: '手掌較大、放置偏低稍慢' }
+        { id: 'DEMO1', scale: 0.94, yShift: -0.02, speedMul: 0.92, note: '模擬示範：手掌較小、動作偏快' },
+        { id: 'DEMO2', scale: 1.05, yShift:  0.00, speedMul: 1.00, note: '模擬示範：標準體型、自然語速' },
+        { id: 'DEMO3', scale: 1.14, yShift:  0.03, speedMul: 1.15, note: '模擬示範：手掌較大、放置偏低稍慢' }
       ];
       const targetObjs = state.objects.slice(0, 6);
       let added = 0;
@@ -2465,29 +2717,43 @@
               if (f.dominant) { f.dominant.wrist.x += jx; f.dominant.wrist.y += prof.yShift + jy; f.dominant.landmarks = generateHand21(f.dominant.wrist.x, f.dominant.wrist.y, f.dominant.handshape, f.dominant.palm, state.handedness === 'right', prof.scale); }
               if (f.nonDominant) { f.nonDominant.wrist.y += prof.yShift; f.nonDominant.landmarks = generateHand21(f.nonDominant.wrist.x, f.nonDominant.wrist.y, f.nonDominant.handshape, f.nonDominant.palm, state.handedness !== 'right', prof.scale); }
             });
-            const smp = { id: `ms_${prof.id}_${obj.id}_r${rep}`, label: `${obj.name}放在桌子上`, signerId: prof.id, objectId: obj.id, ruleId: obj.ruleId, dhShape: obj.handshape, dhPalm: obj.palm, ndhMode: obj.ndhMode, handedness: state.handedness, fps: 15, frameCount: frames.length, createdAt: `模擬語者 ${prof.id} 第${rep}次`, frames };
+            const smp = {
+              id: `demo_ms_${prof.id}_${obj.id}_r${rep}`, dataSource: 'demo', clipType: 'sentence',
+              sentenceId: SENTENCE_MAP[obj.id]?.id || '', label: `${obj.name}放在桌子上`,
+              signerId: prof.id, objectId: obj.id, ruleId: obj.ruleId,
+              objectFeature: obj.shapeDesc || '', classifierTag: obj.classifierTag || '',
+              dhShape: obj.handshape, expectedDhShape: obj.handshape, observedDhShape: obj.handshape,
+              dhPalm: obj.palm, ndhMode: obj.ndhMode, expectedNdhMode: obj.ndhMode, observedNdhMode: obj.ndhMode,
+              reviewStatus: '正常', consentSigned: '否', useForTraining: '否',
+              sourceFile: 'simulated_multi_signer', sourceNote: `${prof.note} 第${rep}次`,
+              createdAt: '', handedness: state.handedness, fps: 15, frameCount: frames.length, frames
+            };
             state.samples = state.samples.filter(x => x.id !== smp.id);
             state.samples.unshift(smp); await idbPut('samples', smp); added++;
           }
         }
       }
       renderAll();
-      await appendLearningLog(`👥 已建立 3 位模擬聾人語者 (D01~D03) 共 ${added} 筆含個體差異語料`);
-      await trainSelfLearningModel();
-      runCrossSignerEvaluation();
+      await appendLearningLog(`👥 已建立 ${added} 筆示範用模擬語料（全部標記 data_source=demo，不納入正式訓練與真實雲端同步）`);
     }
 
     function runCrossSignerEvaluation() {
       const box = document.getElementById('losoResultBox');
-      const signerIds = [...new Set(state.samples.map(s => s.signerId || 'D01'))].sort();
-      if (signerIds.length < 2) {
-        box.innerHTML = `<b style="color:var(--warn);">目前僅有 ${signerIds.length} 位語者，請先加入至少 2 位語者樣本或點擊「模擬 3 位聾人」。</b>`;
+      const eligible = state.samples.filter(isTrainableRealSample);
+      const signerIds = [...new Set(eligible.map(s => s.signerId || 'D01'))].sort();
+      // Item 15 HARD RULE: Require >= 3 real signers! Do NOT show misleading percentage when < 3!
+      if (signerIds.length < 3) {
+        state.lastLosoReport = null;
+        document.getElementById('btnExportLosoCsv').disabled = true;
+        const cmEl = document.getElementById('confusionMatrixBox'); if (cmEl) cmEl.innerHTML = '';
+        box.innerHTML = `<b style="color:var(--warn);">⚠️ 語者不足，無法進行跨語者評測</b>（目前僅有 <b>${signerIds.length}</b> 位符合訓練資格的真實語者：${signerIds.join('、') || '無'}；需至少 <b>3 位</b>真實語者才可計算跨語者評測，請勿以單一或兩人數據當跨語者成績）。`;
         return;
       }
       const folds = []; let totC = 0, totP = 0, totN = 0;
+      const cmPairs = [];
       for (const testSigner of signerIds) {
-        const trainSet = state.samples.filter(s => (s.signerId || 'D01') !== testSigner);
-        const testSet = state.samples.filter(s => (s.signerId || 'D01') === testSigner);
+        const trainSet = eligible.filter(s => (s.signerId || 'D01') !== testSigner);
+        const testSet = eligible.filter(s => (s.signerId || 'D01') === testSigner);
         if (!trainSet.length || !testSet.length) continue;
         const { prototypes } = buildPrototypesFromSamples(trainSet);
         let fc = 0, fp = 0;
@@ -2495,7 +2761,10 @@
           const seq = extractNormalizedSequence(smp.frames, 18);
           let best = null, bestDist = Infinity;
           for (const p of prototypes) { const d = dtwDistance(seq, p.centroid); if (d < bestDist) { bestDist = d; best = p; } }
-          if (best && (best.key === (smp.objectId || smp.dhShape) || best.handshape === smp.dhShape)) fc++;
+          const actualLabel = smp.label || smp.objectId;
+          const predLabel = best ? best.label : '未匹配';
+          cmPairs.push({ actual: actualLabel, pred: predLabel });
+          if (best && (best.key === (smp.objectId || smp.dhShape) || best.label === actualLabel)) fc++;
           if (analyzeLandmarkSequence(smp.frames, smp.objectId).isPut) fp++;
         }
         totC += fc; totP += fp; totN += testSet.length;
@@ -2503,19 +2772,27 @@
       }
       const overallShapeAcc = Math.round((totC / Math.max(1, totN)) * 100);
       const overallPutAcc = Math.round((totP / Math.max(1, totN)) * 100);
-      state.lastLosoReport = { tolerance: { ...state.tolerance }, overallShapeAcc, overallPutAcc, totalCount: totN, folds };
+      const cm = renderConfusionMatrix(cmPairs, `LOSO 跨語者混淆表（${signerIds.length} 位真實語者 · ${totN} 筆 · 列＝實際 · 欄＝預測）`);
+      state.lastLosoReport = { tolerance: { ...state.tolerance }, overallShapeAcc, overallPutAcc, totalCount: totN, folds, confusionMatrix: cm };
       document.getElementById('btnExportLosoCsv').disabled = false;
-      box.innerHTML = `<div class="between" style="padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:6px;"><b>LOSO 跨語者平均（${signerIds.length} 人 / ${totN} 筆）</b><b style="color:var(--sage);">手形 ${overallShapeAcc}% · 放動詞 ${overallPutAcc}%</b></div>` +
-        folds.map(f => `<div class="between" style="font-family:monospace;"><span>訓練 [${f.trainSigners}] → 測 <b>${f.testSigner}</b> (${f.testCount}筆)</span><span>手形 ${f.shapeAcc}% · 放 ${f.putAcc}%</span></div>`).join('');
-      appendLearningLog(`📊 完成跨語者留一驗證（${signerIds.join('/')}）：手形 ${overallShapeAcc}%、「放」共構 ${overallPutAcc}%`);
+      box.innerHTML = `<div class="between" style="padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:6px;"><b>LOSO 跨語者平均（${signerIds.length} 位真實語者 / ${totN} 筆）</b><b style="color:var(--sage);">句意辨識 ${overallShapeAcc}% · 放動詞驗證 ${overallPutAcc}%</b></div>` +
+        folds.map(f => `<div class="between" style="font-family:monospace;"><span>訓練 [${f.trainSigners}] → 測 <b>${f.testSigner}</b> (${f.testCount}筆)</span><span>句意 ${f.shapeAcc}% · 放 ${f.putAcc}%</span></div>`).join('');
+      appendLearningLog(`📊 完成跨語者留一驗證（${signerIds.join('/')}，已排除 demo）：句意 ${overallShapeAcc}%、「放」共構 ${overallPutAcc}%`);
     }
 
     function exportLosoReport() {
       const r = state.lastLosoReport; if (!r) return;
-      const lines = ['train_signers,test_signer,test_samples,handshape_acc_pct,put_verb_acc_pct,norm_scale,dy_threshold,contact_tol_pct',
+      const lines = ['train_signers,test_signer,test_samples,sentence_acc_pct,put_verb_acc_pct,norm_scale,dy_threshold,contact_tol_pct',
         ...r.folds.map(f => [f.trainSigners, f.testSigner, f.testCount, f.shapeAcc, f.putAcc, r.tolerance.normalizeScale, r.tolerance.dyMin, Math.round(r.tolerance.contactRatio*100)].join(',')),
         `OVERALL,ALL,${r.totalCount},${r.overallShapeAcc},${r.overallPutAcc},${r.tolerance.normalizeScale},${r.tolerance.dyMin},${Math.round(r.tolerance.contactRatio*100)}`];
-      triggerDownload(new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_cross_signer_evaluation.csv');
+      if (r.confusionMatrix?.labels?.length) {
+        lines.push('', 'CONFUSION_MATRIX (Row=Actual / Col=Predicted)');
+        lines.push(['Actual\\Predicted', ...r.confusionMatrix.labels].join(','));
+        r.confusionMatrix.labels.forEach(a => {
+          lines.push([a, ...r.confusionMatrix.labels.map(b => r.confusionMatrix.mat[a][b])].join(','));
+        });
+      }
+      triggerDownload(new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_cross_signer_evaluation.csv');
     }
 
     function matchWithTrainedModel(frames) {
@@ -2589,9 +2866,22 @@
       const obj = state.objects.find(o => o.id === objId) || state.objects[0];
       const clipType = document.getElementById('learnVidClipType')?.value || 'sentence';
       const label = document.getElementById('learnVidLabel').value.trim() || (clipType === 'word_noun' ? obj.name : (clipType === 'word_loc' ? '桌子' : `${obj.name}放在桌子上`));
-      const signerId = (document.getElementById('learnVidSignerId')?.value || 'D01').trim() || 'D01';
+      const signerId = (document.getElementById('learnVidSignerId')?.value || '').trim();
+      if (!signerId || /[\u4e00-\u9fff]/.test(signerId)) {
+        alert('為了隱私保護，語者代號請勿填寫真實姓名！請改填匿名代號（如 D01、D02）。');
+        return;
+      }
 
-      if (btn) { btn.disabled = true; btn.textContent = '⏳ 解析與上傳中...'; }
+      // Item 3: Pre-save contradictory label guard
+      const issues = validateSampleConsistency(label, obj?.id, obj?.ruleId, clipType);
+      let reviewStatus = '正常';
+      if (issues.length) {
+        const proceed = confirm(`⚠️ 偵測到標註矛盾：\n• ${issues.join('\n• ')}\n\n按「取消」回去修正；按「確定」將標記為「待人工確認」且不納入訓練。`);
+        if (!proceed) return;
+        reviewStatus = '待人工確認';
+      }
+
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ 解析與檢查中...'; }
       statusEl.textContent = `正在逐幀解析語者 ${signerId} 影片「${file.name}」...`;
       try {
         const url = URL.createObjectURL(file);
@@ -2599,6 +2889,21 @@
         vid.src = url; vid.muted = true; vid.playsInline = true;
         await new Promise((res, rej) => { vid.onloadedmetadata = res; vid.onerror = rej; });
         const dur = Math.min(6.0, Math.max(1.2, vid.duration || 2.5)), fps = 12, total = Math.round(dur * fps);
+
+        // Item 2: Duplicate video upload check (same source_file + same signer_id + similar duration!)
+        const dup = state.samples.find(s =>
+          (s.sourceFile === file.name || (s.sourceNote || '').includes(file.name)) &&
+          (s.signerId || '') === signerId &&
+          s.reviewStatus !== 'duplicate' &&
+          Math.abs(((s.frames?.[s.frames.length - 1]?.timestampMs || 0) / 1000) - dur) < 1.5
+        );
+        if (dup) {
+          URL.revokeObjectURL(url);
+          statusEl.textContent = `⚠️ 已攔截重複上傳：語者 ${signerId} 的影片「${file.name}」（約 ${dur.toFixed(1)}s）已存在（ID: ${dup.id}），未重複寫入！`;
+          if (btn) { btn.disabled = false; btn.textContent = '✅ 2. 確認解析並上傳'; }
+          return;
+        }
+
         const extracted = [];
         const dhTarget = state.handedness === 'right' ? 'Right' : 'Left';
         let mpTs = Math.round(performance.now()) + 5000;
@@ -2632,31 +2937,46 @@
 
         const usedRealMp = extracted.length >= 6;
         const frames = usedRealMp ? extracted : synthesizeSequence({ objectId: obj.id }, fps, dur);
+        const analysis = frames.length >= 5 ? analyzeLandmarkSequence(frames, obj.id) : null;
+        const dataSource = usedRealMp ? 'real' : 'demo';
+        const consentSigned = (dataSource === 'real' && document.getElementById('chkLearnConsentSigned')?.checked) ? '是' : '否';
+        const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是') ? '是' : '否';
         const smp = {
-          id: 'vid_' + Date.now(), clipType, label, signerId, objectId: obj.id, ruleId: obj.ruleId,
-          dhShape: frames[frames.length - 1]?.dominant?.handshape || obj.handshape,
-          dhPalm: frames[frames.length - 1]?.dominant?.palm || obj.palm,
-          ndhMode: obj.ndhMode, handedness: state.handedness, fps, frameCount: frames.length,
-          createdAt: usedRealMp ? `MediaPipe 語者 ${signerId} (${file.name})` : `影片語者 ${signerId} (${file.name})`, frames
+          id: 'vid_' + Date.now(), dataSource, clipType,
+          sentenceId: clipType === 'sentence' ? (SENTENCE_MAP[obj.id]?.id || '') : '',
+          label, signerId, objectId: obj.id, ruleId: obj.ruleId,
+          objectFeature: obj.shapeDesc || '', classifierTag: obj.classifierTag || '',
+          dhShape: obj.handshape, expectedDhShape: obj.handshape,
+          observedDhShape: analysis?.observedDh || '',
+          dhPalm: obj.palm, dhAperture: '', intendedSize: '',
+          ndhMode: obj.ndhMode, expectedNdhMode: obj.ndhMode,
+          observedNdhMode: analysis?.observedNdh || '',
+          putStatus: clipType === 'sentence' ? (analysis?.putStatus || '非放動作') : '不適用（單詞/手形）',
+          actualOrder: '', orderType: analysis?.detectedOrderType || '', referentMentionedBefore: '',
+          reviewStatus, consentSigned, useForTraining,
+          sourceFile: file.name,
+          sourceNote: usedRealMp ? `MediaPipe 影片解析 (${file.name})` : `未偵測到真實手部改用範例 (${file.name})`,
+          createdAt: formatIsoTime(new Date()),
+          handedness: state.handedness, fps, frameCount: frames.length, frames
         };
         state.samples.unshift(smp); await idbPut('samples', smp);
         renderSampleList(); refreshRecognizerSelects(); refreshAvatarLmSelect();
         statusEl.textContent = usedRealMp
-          ? `✅ MediaPipe 成功抽取語者 ${signerId} 共 ${frames.length} 幀真實雙手骨架並重新訓練！`
-          : `✅ 已建立語者 ${signerId} 共 ${frames.length} 幀語料樣本並重新訓練！`;
-        await appendLearningLog(`🎬 影片自學：語者 ${signerId}「${file.name}」→「${label}」(${usedRealMp ? '真實 MediaPipe' : '輔助模板'} ${frames.length} 幀)`);
+          ? `✅ MediaPipe 成功抽取語者 ${signerId} 共 ${frames.length} 幀真實骨架（實際主手：${formatHandshapeTag(smp.observedDhShape)}，狀態：${smp.putStatus}）！`
+          : `⚠️ 影片未偵測到足夠真實手部，已標記為 demo 範例（不納入正式訓練）。`;
+        await appendLearningLog(`🎬 影片上傳：語者 ${signerId}「${file.name}」→「${label}」(${dataSource}, ${frames.length} 幀, 訓練:${useForTraining})`);
         await trainSelfLearningModel();
-        let finalHtml = `✅ 全部完成！「${label}」（語者 ${signerId}，${frames.length} 幀）已存入本機並重新訓練。`;
-        if (document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) {
-          statusEl.textContent = '☁️ 正在同步骨架到 Google 試算表並上傳影片到硬碟...';
+        let finalHtml = `✅ 全部完成！「${label}」（代號 ${signerId}，${frames.length} 幀，狀態：${reviewStatus}）。`;
+        if (dataSource === 'real' && document.getElementById('chkAutoSyncGs')?.checked && getGsEndpoint()) {
+          statusEl.textContent = '☁️ 正在同步至 Google 試算表並上傳完整骨架 JSON 與影片（限制存取）...';
           const syncRes = await syncUploadSampleToGs(smp, file, `${signerId}_${file.name}`, (msg) => { statusEl.textContent = msg; });
           if (syncRes?.ok && syncRes.videoOk && syncRes.videoUrl) {
-            finalHtml = `✅ 骨架已進試算表 ＋ 影片已存進 Google 硬碟！` +
+            finalHtml = `✅ 試算表＋完整骨架 JSON＋影片（限制存取）全部同步完成！` +
               (isParticipantMode() ? '' : ` <a href="${syncRes.videoUrl}" target="_blank" style="color:var(--primary);font-weight:700;">🎬 開啟硬碟影片</a>`);
           } else if (syncRes?.ok) {
-            finalHtml = `✅ 骨架已進試算表，但影片未存進硬碟：${syncRes.videoError || '請確認第 1 分頁已勾選「影片存進 Google 硬碟」'}`;
+            finalHtml = `✅ 試算表與骨架已同步，但影片未存進硬碟：${syncRes.videoError || '請確認第 1 分頁已勾選「影片存進 Google 硬碟」'}`;
           } else {
-            finalHtml = `⚠️ 本機已存檔訓練，但雲端同步失敗：${syncRes?.error || '請先至第 1 分頁點「連線測試」'}`;
+            finalHtml = `⚠️ 本機已存檔，但雲端同步失敗：${syncRes?.error || '請先至第 1 分頁點「連線測試」'}`;
           }
         }
         cancelLearnVideoSelection();
@@ -2750,7 +3070,40 @@
       let obj = state.objects.find(o => o.name === p.noun);
       if (obj) { obj.ruleId = rId; obj.handshape = sh; obj.palm = pm; obj.ndhMode = ndhMode; }
       else { obj = { id: 'obj_ai_' + Date.now(), name: p.noun, shapeDesc: p.shapeDesc, lexicalGloss: `${p.noun}（AI 自學）`, ruleId: rId, handshape: sh, palm: pm, ndhMode, note: `AI 推論並經研究者${corrected ? '修正' : '核准'}` }; state.objects.push(obj); }
-      const smp = { id: 'ai_smp_' + Date.now(), label: `${obj.name}放在桌子上`, objectId: obj.id, ruleId: obj.ruleId, dhShape: obj.handshape, dhPalm: obj.palm, ndhMode, frameCount: 38, createdAt: corrected ? 'AI 自學＋研究者修正' : 'AI 舉一反三核准', frames: synthesizeSequence({ objectId: obj.id }, 15, 2.5) };
+      const smp = {
+        id: 'demo_ai_' + Date.now(),
+        label: `${obj.name}放在桌子上`,
+        clipType: 'sentence',
+        sentenceId: '',
+        objectId: obj.id,
+        ruleId: obj.ruleId,
+        expectedDhShape: obj.handshape,
+        observedDhShape: obj.handshape,
+        dhShape: obj.handshape,
+        dhAperture: '',
+        intendedSize: '',
+        dhPalm: obj.palm,
+        expectedNdhMode: ndhMode,
+        observedNdhMode: ndhMode,
+        ndhMode,
+        signerId: 'DEMO_AI',
+        signerRole: 'demo_synthetic',
+        handedness: 'right',
+        fps: 15,
+        sourceFile: 'synthetic_demo',
+        dataSource: 'demo',
+        reviewStatus: '正常',
+        useForTraining: '否',
+        consentSigned: '否',
+        putStatus: '已驗證為放',
+        actualOrder: '',
+        orderType: '',
+        referentMentionedBefore: '',
+        createdAt: '',
+        sourceNote: corrected ? 'AI 自學＋研究者修正（示範骨架，不列入真實訓練）' : 'AI 舉一反三核准（示範骨架，不列入真實訓練）',
+        frameCount: 38,
+        frames: synthesizeSequence({ objectId: obj.id }, 15, 2.5)
+      };
       state.samples.unshift(smp); await persistConfig(); await idbPut('samples', smp);
       await appendLearningLog(corrected ? `✏️ 糾錯學習：「${obj.name}」原推 ${p.handshape} → 修正為【${rule.code} / ${sh}】` : `✅ AI 自主學會：「${obj.name}放在桌子上」→【${rule.code} / ${sh}】`);
       document.getElementById('aiProposalCard').classList.add('hidden'); state.currentProposal = null;
@@ -2804,17 +3157,35 @@
 
     function r3(v) { return Math.round((Number(v) || 0) * 1000) / 1000; }
 
-    // Compress landmark sequence cleanly to <= 44,000 chars (well below Google Sheets 50,000-char cell limit!)
-    function packFramesForSheet(frames, maxFrames = 48) {
+    // Item 6: Strict UNIFORM TIME-INTERVAL sampling across ALL frames for compact_landmarks preview (full frames saved separately to Drive JSON!)
+    function packFramesForSheet(frames, maxFrames = 64) {
       if (!frames || !frames.length) return '[]';
-      const live = frames.filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
-      const src = live.length >= 5 ? live : frames;
+      const src = frames.filter(Boolean);
+      if (!src.length) return '[]';
+      const getTs = (f, idx) => (typeof f.timestampMs === 'number' && !isNaN(f.timestampMs)) ? f.timestampMs : idx * 66;
+      const t0 = getTs(src[0], 0);
+      const t1 = getTs(src[src.length - 1], src.length - 1);
+      const span = Math.max(1, t1 - t0);
+
       const encode = (limit) => {
         const out = [];
         const n = Math.min(limit, src.length);
+        let minJ = 0;
         for (let i = 0; i < n; i++) {
-          const idx = n === 1 ? 0 : Math.min(src.length - 1, Math.round((i / (n - 1)) * (src.length - 1)));
-          const f = src[idx];
+          let f;
+          if (n === src.length) {
+            f = src[i];
+          } else {
+            const targetMs = t0 + (i / Math.max(1, n - 1)) * span;
+            const maxJ = src.length - (n - i);
+            let bestJ = minJ, bestDiff = Infinity;
+            for (let j = minJ; j <= maxJ; j++) {
+              const diff = Math.abs(getTs(src[j], j) - targetMs);
+              if (diff < bestDiff) { bestDiff = diff; bestJ = j; }
+            }
+            minJ = bestJ + 1;
+            f = src[bestJ];
+          }
           const packHand = (h) => h ? [
             h.side === 'Left' ? 'L' : 'R',
             h.handshape || 'Open O',
@@ -2828,8 +3199,8 @@
         return JSON.stringify(out);
       };
       let str = encode(maxFrames);
-      if (str.length > 45000) str = encode(32);
-      if (str.length > 45000) str = encode(20);
+      if (str.length > 45000) str = encode(44);
+      if (str.length > 45000) str = encode(28);
       return str;
     }
 
@@ -2897,6 +3268,7 @@
       }
     }
 
+    // Build EXACT same 39-column Google Sheet payload as record.html & google_apps_script.gs!
     function buildSheetRowFromSample(s) {
       const rule = state.rules.find(r => r.id === s.ruleId);
       const obj = state.objects.find(o => o.id === s.objectId);
@@ -2905,30 +3277,55 @@
       const endMs = s.frames?.[s.frames.length - 1]?.timestampMs || 0;
       const maxBrow = (s.frames || []).reduce((m, f) => Math.max(m, f?.face?.browUp || 0), 0);
       const dyMatch = (analysis?.trajSummary || '').match(/Δy=\+?(-?[\d.]+)/);
+      const dataSource = s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real');
+      const reviewStatus = s.reviewStatus || '正常';
+      const consentSigned = s.consentSigned || (dataSource === 'demo' ? '否' : '是');
+      const useForTraining = (dataSource === 'real' && reviewStatus === '正常' && consentSigned === '是' && s.useForTraining !== '否') ? '是' : '否';
+      const clipType = s.clipType || 'sentence';
+      const ndhHoldPct = analysis?.ndhHoldScore || 0;
+      const putStatus = clipType !== 'sentence' ? '不適用（單詞/手形）' : (analysis?.putStatus || s.putStatus || '非放動作');
+      const isPutVerified = (clipType === 'sentence' && ndhHoldPct >= 50 && Boolean(analysis?.isPut) && putStatus === '已驗證為放');
+
       return {
         sample_id: s.id,
         signer_id: s.signerId || 'D01',
-        clip_type: s.clipType || 'sentence',
+        data_source: dataSource,
+        clip_type: clipType,
+        sentence_id: s.sentenceId || (clipType === 'sentence' ? (SENTENCE_MAP[s.objectId]?.id || '') : ''),
         label: s.label || '',
         object_id: s.objectId || '',
-        rule_code: s.clipType === 'word_handshape' ? '手形教學' : (s.clipType === 'word_noun' ? '單詞名詞' : (s.clipType === 'word_loc' ? '單詞處所' : (rule ? rule.code : '自訂'))),
-        dh_shape: s.dhShape || '',
+        object_feature: s.objectFeature || obj?.shapeDesc || '',
+        classifier_tag: s.classifierTag || obj?.classifierTag || '',
+        rule_code: clipType === 'word_handshape' ? '手形教學' : (clipType === 'word_noun' ? '單詞名詞' : (clipType === 'word_loc' ? '單詞處所' : (rule ? rule.code : '自訂'))),
+        expected_dh_shape: s.expectedDhShape || s.dhShape || obj?.handshape || '',
+        observed_dh_shape: s.observedDhShape || analysis?.observedDh || '',
         dh_palm: s.dhPalm || 'up',
-        ndh_mode: s.ndhMode || '',
+        dh_aperture: s.dhAperture || '',
+        intended_size: s.intendedSize || '',
+        expected_ndh_mode: s.expectedNdhMode || s.ndhMode || obj?.ndhMode || '',
+        observed_ndh_mode: s.observedNdhMode || analysis?.observedNdh || '',
         handedness: s.handedness || 'right',
         fps: s.fps || 15,
         frame_count: s.frameCount || (s.frames?.length || 0),
         start_ms: startMs,
         end_ms: endMs,
-        ndh_hold_pct: analysis?.ndhHoldScore || 0,
+        ndh_hold_pct: ndhHoldPct,
         path_dy: dyMatch ? Number(dyMatch[1]) : 0,
         brow_up_max: r3(maxBrow),
-        is_put_verified: Boolean(analysis?.isPut),
+        put_status: putStatus,
+        is_put_verified: isPutVerified,
+        actual_order: s.actualOrder || '',
+        order_type: s.orderType || analysis?.detectedOrderType || '',
+        referent_mentioned_before: s.referentMentionedBefore || '',
+        review_status: reviewStatus,
+        use_for_training: useForTraining,
+        consent_signed: consentSigned,
+        source_file: s.sourceFile || '',
+        source_note: s.sourceNote || '',
+        created_at: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(s.createdAt || '')) ? s.createdAt : '',
         video_url: s.videoUrl || '',
-        created_at: s.createdAt || new Date().toISOString(),
-        compact_landmarks: packFramesForSheet(s.frames, 48),
-        object_feature: s.objectFeature || obj?.shapeDesc || '',
-        classifier_tag: s.classifierTag || obj?.classifierTag || ''
+        landmarks_file_url: s.landmarksFileUrl || '',
+        compact_landmarks: packFramesForSheet(s.frames, 64)
       };
     }
 
@@ -3073,6 +3470,9 @@
 
     async function syncUploadSampleToGs(smp, videoBlob = null, customVideoName = null, onStatus = null) {
       const url = getGsEndpoint(); if (!url || !smp) return { ok: false, error: '未設定試算表網址' };
+      const ds = smp.dataSource || (String(smp.id || '').startsWith('demo_') || String(smp.id || '').startsWith('ms_') ? 'demo' : 'real');
+      if (ds === 'demo') return { ok: true, skippedDemo: true };
+
       setSyncStatus(`☁️ 正在安全回傳「${smp.label}」...`);
       try {
         const row = buildSheetRowFromSample(smp);
@@ -3083,9 +3483,30 @@
         });
         const data = await res.json();
         if (data.ok) {
+          // Item 6: Upload FULL uncompressed frames JSON to Google Drive (Restricted!)
+          if (smp.frames?.length && !smp.landmarksFileUrl) {
+            try {
+              const lmRes = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  action: 'upload_landmarks',
+                  sample_id: smp.id,
+                  signer_id: smp.signerId || 'D01',
+                  json_content: JSON.stringify({ sample_id: smp.id, signer_id: smp.signerId, sentence_id: row.sentence_id, label: smp.label, fps: smp.fps || 15, frame_count: smp.frames.length, frames: smp.frames })
+                })
+              });
+              const lmData = await lmRes.json();
+              if (lmData.ok && lmData.file_url) {
+                smp.landmarksFileUrl = lmData.file_url;
+                await idbPut('samples', smp);
+                renderSampleList();
+              }
+            } catch (e) {}
+          }
           setSyncStatus(
             `✅ 已安全回傳給研究者：「${smp.label}」`,
-            `✅ 已同步至 Google 試算表：「${smp.label}」（${Math.round(row.compact_landmarks.length / 1024 * 10) / 10} KB）`
+            `✅ 已同步至 Google 試算表＋完整骨架 JSON：「${smp.label}」`
           );
           if (videoBlob && document.getElementById('chkUploadVideoToDrive')?.checked) {
             const vRes = await uploadVideoBlobToDrive(videoBlob, smp, customVideoName, onStatus);
@@ -3102,11 +3523,15 @@
     async function syncUploadAllToGs() {
       const url = getGsEndpoint();
       if (!url) { document.getElementById('gsSyncMessage').textContent = '請先貼上 Google Apps Script 網址並儲存。'; return; }
-      const realOnly = state.samples.filter(s => !String(s.id).startsWith('demo_'));
-      const targets = realOnly.length ? realOnly : state.samples;
-      document.getElementById('gsSyncMessage').textContent = `☁️ 正在批次上傳 ${targets.length} 筆語料到 Google 試算表...`;
+      // Item 1: NEVER upload demo samples as real samples!
+      const realOnly = state.samples.filter(s => (s.dataSource || (String(s.id || '').startsWith('demo_') || String(s.id || '').startsWith('ms_') ? 'demo' : 'real')) === 'real');
+      if (!realOnly.length) {
+        document.getElementById('gsSyncMessage').textContent = '⚠️ 目前沒有「真實語料 (real)」可上傳（示範 demo 資料依規定不會同步至真實試算表）。';
+        return;
+      }
+      document.getElementById('gsSyncMessage').textContent = `☁️ 正在批次上傳 ${realOnly.length} 筆真實語料到 Google 試算表（已自動排除 demo）...`;
       try {
-        const rows = targets.map(buildSheetRowFromSample);
+        const rows = realOnly.map(buildSheetRowFromSample);
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -3114,10 +3539,32 @@
         });
         const data = await res.json();
         if (data.ok) {
-          document.getElementById('gsSyncMessage').textContent = `✅ 成功同步 ${data.count} 筆語料到 Google 試算表！`;
+          document.getElementById('gsSyncMessage').textContent = `✅ 成功同步 ${data.count} 筆真實語料到 Google 試算表（已自動排除所有 demo 範例）！`;
         } else throw new Error(data.error || '批次上傳失敗');
       } catch (err) {
         document.getElementById('gsSyncMessage').textContent = `批次上傳失敗：${err.message}`;
+      }
+    }
+
+    async function runSheetBackupAndMigrate() {
+      const url = getGsEndpoint();
+      if (!url) { document.getElementById('gsSyncMessage').textContent = '請先設定 Google Apps Script 網址並儲存。'; return; }
+      if (!confirm('即將執行「試算表自動備份＋39 欄研究結構升級」：\n1. 先在 Google 雲端硬碟另存整份試算表備份副本（絕不刪除任何原始資料）\n2. 標記 demo / duplicate / 待人工確認 / 測試評估\n3. 匿名化真實姓名並獨立存檔對照表、重算所有放驗證\n4. 將硬碟影片設為「限制存取」\n\n確認執行？')) return;
+      document.getElementById('gsSyncMessage').textContent = '🛠️ 正在備份試算表並執行非破壞性資料清理與欄位升級...';
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'migrate_sheet' })
+        });
+        const d = await res.json();
+        if (!d.ok) throw new Error(d.error || '遷移失敗（請確認 Apps Script 已貼上最新 v2.0 並部署「新版本」）');
+        const reviewTxt = (d.manual_review_list || []).length ? `；待人工確認：${d.manual_review_list.join('、')}` : '；無待人工確認樣本';
+        document.getElementById('gsSyncMessage').innerHTML =
+          `✅ 備份與升級完成！<a href="${d.backup_url}" target="_blank" style="color:var(--primary);font-weight:700;">📄 備份副本</a> · Samples 總計 <b>${d.total_samples}</b> 筆 · 可用於訓練(是) <b>${d.use_for_training_yes}</b> 筆 · 影片已限制存取 <b>${d.restricted_drive_files}</b> 檔${reviewTxt}`;
+        await syncPullFromGs();
+      } catch (err) {
+        document.getElementById('gsSyncMessage').textContent = `升級失敗：${err.message}`;
       }
     }
 
@@ -3134,23 +3581,42 @@
           const frames = unpackFramesFromSheet(r.compact_landmarks, r.handedness || 'right');
           if (!frames.length && !r.video_url) continue;
           const obj = state.objects.find(o => o.id === r.object_id) || state.objects[0];
+          const expDh = r.expected_dh_shape || r.dh_shape || obj.handshape;
+          const expNdh = r.expected_ndh_mode || r.ndh_mode || obj.ndhMode;
+          const ds = r.data_source || (String(r.sample_id || '').startsWith('demo_') ? 'demo' : 'real');
           const smp = {
             id: String(r.sample_id),
+            dataSource: ds,
             clipType: r.clip_type || 'sentence',
+            sentenceId: String(r.sentence_id || (r.clip_type === 'sentence' ? (SENTENCE_MAP[r.object_id]?.id || '') : '')),
             label: String(r.label || '雲端語料'),
             signerId: String(r.signer_id || 'D01'),
             objectId: r.object_id || obj.id,
             objectFeature: String(r.object_feature || obj.shapeDesc || ''),
             classifierTag: String(r.classifier_tag || obj.classifierTag || ''),
             ruleId: obj.ruleId,
-            dhShape: r.dh_shape || obj.handshape,
+            dhShape: expDh, expectedDhShape: expDh,
+            observedDhShape: String(r.observed_dh_shape || ''),
             dhPalm: r.dh_palm || 'up',
-            ndhMode: r.ndh_mode || obj.ndhMode,
+            dhAperture: String(r.dh_aperture || ''),
+            intendedSize: String(r.intended_size || ''),
+            ndhMode: expNdh, expectedNdhMode: expNdh,
+            observedNdhMode: String(r.observed_ndh_mode || ''),
+            putStatus: String(r.put_status || ''),
+            actualOrder: String(r.actual_order || ''),
+            orderType: String(r.order_type || ''),
+            referentMentionedBefore: String(r.referent_mentioned_before || ''),
+            reviewStatus: String(r.review_status || '正常'),
+            useForTraining: String(r.use_for_training || (ds === 'real' ? '是' : '否')),
+            consentSigned: String(r.consent_signed || (ds === 'real' ? '是' : '否')),
+            sourceFile: String(r.source_file || ''),
+            sourceNote: String(r.source_note || ''),
             handedness: r.handedness || 'right',
             fps: Number(r.fps || 15),
-            frameCount: frames.length,
+            frameCount: Number(r.frame_count || frames.length),
             videoUrl: String(r.video_url || ''),
-            createdAt: `☁️ ${r.created_at || '雲端同步'}`,
+            landmarksFileUrl: String(r.landmarks_file_url || ''),
+            createdAt: String(r.created_at || ''),
             frames
           };
           state.samples = state.samples.filter(x => x.id !== smp.id);
@@ -3165,7 +3631,7 @@
         }
         renderAll();
         document.getElementById('gsStatusBadge').textContent = `✅ 已同步 ${merged} 筆`;
-        document.getElementById('gsSyncMessage').textContent = `✅ 已從 Google 試算表同步 ${merged} 筆語料與 ${(data.evaluations || []).length} 筆聾人評估！`;
+        document.getElementById('gsSyncMessage').textContent = `✅ 已從 Google 試算表同步 ${merged} 筆語料與 ${(data.evaluations || []).length} 筆評估！`;
       } catch (err) {
         document.getElementById('gsSyncMessage').textContent = `下載同步失敗：${err.message}`;
       }
@@ -3180,7 +3646,7 @@
       const shareUrl = `${recordPageUrl}?k=${encodeURIComponent(encoded)}`;
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(shareUrl).then(() => {
-          document.getElementById('gsSyncMessage').textContent = '🔒 已複製「受試者專屬錄製頁 (record.html)」連結！對方點開只會看到乾淨的逐題引導錄影頁，看不到任何管理後台或他人資料。';
+          document.getElementById('gsSyncMessage').textContent = '🔒 已複製「受試者專屬錄製頁 (record.html)」連結！對方點開只會看到乾淨的不限語序錄影頁，看不到任何管理後台或他人資料。';
         });
       } else {
         prompt('請複製以下受試者專屬錄製連結：', shareUrl);
@@ -3193,24 +3659,28 @@
       document.getElementById('participantSyncBanner')?.classList.remove('hidden');
     }
 
-    // Export Standard Linguistic Annotation Table matching Course Final Report Slide 13!
+    // Export Complete 38-Column Linguistic Annotation Table (excluding raw compact_landmarks)
     function exportLinguisticAnnotationCsv() {
       if (!state.samples.length) return;
-      const header = 'sample_id,signer_id,clip_type,label,object_feature,classifier_tag,rule_code,variant_id,dh_shape,dh_palm,ndh_mode,handedness,frame_count,start_ms,end_ms,duration_ms,ndh_hold_pct,path_dy,brow_up_max,is_put_verified,video_url,created_at';
+      const cols = [
+        'sample_id','signer_id','data_source','clip_type','sentence_id','label','object_id','object_feature','classifier_tag','rule_code',
+        'expected_dh_shape','observed_dh_shape','dh_palm','dh_aperture','intended_size','expected_ndh_mode','observed_ndh_mode',
+        'handedness','fps','frame_count','start_ms','end_ms','duration_ms','ndh_hold_pct','path_dy','brow_up_max','put_status','is_put_verified',
+        'actual_order','order_type','referent_mentioned_before','review_status','use_for_training','consent_signed',
+        'source_file','source_note','created_at','video_url','landmarks_file_url'
+      ];
       const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const rows = state.samples.map(s => {
         const r = buildSheetRowFromSample(s);
         const dur = Math.max(0, r.end_ms - r.start_ms);
-        const variantId = `${r.rule_code}_${r.classifier_tag || r.dh_shape}_${r.ndh_mode}`;
-        return [
-          r.sample_id, r.signer_id, r.clip_type, r.label, r.object_feature, r.classifier_tag,
-          r.rule_code, variantId, r.dh_shape, r.dh_palm, r.ndh_mode, r.handedness, r.frame_count,
-          r.start_ms, r.end_ms, dur, r.ndh_hold_pct, r.path_dy, r.brow_up_max,
-          r.is_put_verified ? 'TRUE' : 'FALSE', r.video_url, r.created_at
-        ].map(esc).join(',');
+        return cols.map(c => {
+          if (c === 'duration_ms') return dur;
+          if (c === 'is_put_verified') return r.is_put_verified ? 'TRUE' : 'FALSE';
+          return r[c] ?? '';
+        }).map(esc).join(',');
       });
-      triggerDownload(new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_linguistic_annotations.csv');
-      document.getElementById('recMessage').textContent = `📊 已匯出 ${rows.length} 筆語言學標準標註表（可直接貼入期末報告或 Excel）！`;
+      triggerDownload(new Blob(['\uFEFF' + [cols.join(','), ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_linguistic_annotations.csv');
+      document.getElementById('recMessage').textContent = `📊 已匯出 ${rows.length} 筆完整研究標註表（含預期/實際手形、語序、同意書、審核與訓練資格）！`;
     }
 
     // Landmark-Driven Side-by-Side Avatar Controls (Ch8 Slide 31)
@@ -3240,35 +3710,48 @@
       if (!smp) return;
       const live = (smp.frames || []).filter(f => f && (f.phase === 'live' || f.phase === 'video_mp'));
       state.avatarLmFrames = live.length >= 5 ? live : (smp.frames || []);
-      state.avatarLmTitle = `${smp.label}（語者 ${smp.signerId || 'D01'}）`;
+      state.avatarLmTitle = `${smp.label}（代號 ${smp.signerId || 'D01'}）`;
       state.avatarProgress = 0;
       state.avatarPlaying = true;
       drawAvatarScene();
     }
 
-    // Deaf User 4-Dimension Naturalness Evaluation (Ch8 Slide 26 + Ch10 Slide 18)
+    // Deaf User 4-Dimension Naturalness Evaluation (Item 14: exclude is_test === TRUE from formal stats!)
+    function getValidEvaluations() {
+      return (state.evaluations || []).filter(e => !(e.is_test === true || String(e.is_test || '').toUpperCase() === 'TRUE' || /test|測試/i.test(String(e.comment || ''))));
+    }
+
     function renderEvalCount() {
       const el = document.getElementById('evalStatusMsg');
+      const validCount = getValidEvaluations().length;
+      const testCount = (state.evaluations || []).length - validCount;
       if (el) el.textContent = isParticipantMode()
-        ? `感謝回饋！已送出 ${state.evaluations.length} 筆評估`
-        : `已收錄 ${state.evaluations.length} 筆評估（有綁定 Google 試算表將同步上傳）`;
+        ? `感謝回饋！已送出 ${validCount} 筆評估`
+        : `已收錄 ${validCount} 筆正式評估${testCount > 0 ? `（已排除 ${testCount} 筆測試資料）` : ''}`;
     }
 
     async function submitDeafEval() {
+      const evalId = (document.getElementById('evalUserId')?.value || '').trim();
+      if (!evalId || /[\u4e00-\u9fff]/.test(evalId)) {
+        alert('評估者請填寫匿名代號（例如 D01、D02），勿填真實姓名！');
+        return;
+      }
       const sentence = state.avatarMode === 'landmark'
         ? (state.avatarLmTitle || '真實骨架驅動')
         : (document.getElementById('avatarSentenceInput')?.value.trim() || '蘋果放在桌子上');
+      const comment = (document.getElementById('evalComment')?.value || '').trim();
       const ev = {
         eval_id: 'ev_' + Date.now(),
-        evaluator_id: (document.getElementById('evalUserId')?.value || 'D01').trim() || 'D01',
+        evaluator_id: evalId,
         role: document.getElementById('evalUserRole')?.value || '聾人母語者',
         sentence,
         semantic_score: Number(document.getElementById('evalSem')?.value || 5),
         form_score: Number(document.getElementById('evalForm')?.value || 5),
         timing_score: Number(document.getElementById('evalTime')?.value || 5),
         naturalness_score: Number(document.getElementById('evalNat')?.value || 5),
-        comment: (document.getElementById('evalComment')?.value || '').trim(),
-        created_at: new Date().toLocaleString('zh-TW', { hour12: false })
+        comment,
+        created_at: formatIsoTime(new Date()),
+        is_test: /test|測試/i.test(comment) ? 'TRUE' : 'FALSE'
       };
       state.evaluations.unshift(ev);
       await idbPut('config', { key: 'evaluations', data: state.evaluations });
@@ -3279,20 +3762,21 @@
         try {
           await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'add_eval', evaluation: ev }) });
           document.getElementById('evalStatusMsg').textContent = isParticipantMode()
-            ? `✅ 感謝您的回饋！已安全送出評估（共 ${state.evaluations.length} 筆）`
-            : `✅ 已儲存並同步至 Google 試算表！（共 ${state.evaluations.length} 筆）`;
+            ? `✅ 感謝您的回饋！已安全送出評估`
+            : `✅ 已儲存並同步至 Google 試算表！（正式評估 ${getValidEvaluations().length} 筆）`;
         } catch (e) {}
       }
     }
 
     function exportDeafEvalCsv() {
-      if (!state.evaluations.length) {
-        document.getElementById('evalStatusMsg').textContent = '目前尚無評估紀錄，請先填寫上方分數後按「儲存評估」。';
+      const valid = getValidEvaluations();
+      if (!valid.length) {
+        document.getElementById('evalStatusMsg').textContent = '目前尚無正式評估紀錄（測試資料已自動排除）。';
         return;
       }
-      const header = 'eval_id,evaluator_id,role,sentence,semantic_score,form_score,timing_score,naturalness_score,comment,created_at';
+      const header = 'eval_id,evaluator_id,role,sentence,semantic_score,form_score,timing_score,naturalness_score,comment,created_at,is_test';
       const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const rows = state.evaluations.map(e => [e.eval_id, e.evaluator_id, e.role, e.sentence, e.semantic_score, e.form_score, e.timing_score, e.naturalness_score, e.comment, e.created_at].map(esc).join(','));
+      const rows = valid.map(e => [e.eval_id, e.evaluator_id, e.role, e.sentence, e.semantic_score, e.form_score, e.timing_score, e.naturalness_score, e.comment, e.created_at, 'FALSE'].map(esc).join(','));
       triggerDownload(new Blob(['\uFEFF' + [header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' }), 'tsl_put_deaf_evaluation.csv');
     }
 
